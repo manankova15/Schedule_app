@@ -1,9 +1,10 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Enum, Boolean
+from sqlalchemy import ForeignKey, Date, Enum as SAEnum, Boolean
 from sqlalchemy.orm import relationship
 from backend.db.database import Base
+from sqlalchemy import Column, Integer, String
 
 # Роли пользователей
-class UserRoleEnum(str, Enum):
+class UserRoleEnum(SAEnum):
     employee = "employee"
     manager = "manager"
 
@@ -14,10 +15,10 @@ class Employee(Base):
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    phone = Column(String, unique=True, index=True, nullable=False)
+    phone = Column(String, unique=True, index=True, nullable= False)
     position = Column(String, nullable=False)
     shift_quota = Column(Integer, nullable=False)
-    role = Column(Enum(UserRoleEnum), default="employee")
+    role = Column(UserRoleEnum, default=UserRoleEnum.employee)
 
     vacations = relationship("Vacation", back_populates="employee")
     requests = relationship("SpecialRequest", back_populates="employee")
