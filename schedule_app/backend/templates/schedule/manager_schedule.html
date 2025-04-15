@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block title %}Управление расписанием | Расписание Областной Больницы{% endblock %}
+
+{% block content %}
+<div class="manager-schedule">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Управление расписанием</h2>
+        <div>
+            <a href="{% url 'schedule_generator' %}" class="btn btn-primary me-2">
+                Генерировать расписание
+            </a>
+            <a href="{% url 'time_off_requests' %}" class="btn btn-outline-primary">
+                Запросы на отгулы
+            </a>
+        </div>
+    </div>
+    
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="btn-group">
+                    <a href="?view=month&date={{ current_date|date:'Y-m-d' }}" 
+                       class="btn {% if view_mode == 'month' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        Месяц
+                    </a>
+                    <a href="?view=week&date={{ current_date|date:'Y-m-d' }}" 
+                       class="btn {% if view_mode == 'week' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        Неделя
+                    </a>
+                </div>
+                
+                <h3 class="mb-0">{{ header_text }}</h3>
+                
+                <div class="btn-group">
+                    <a href="?view={{ view_mode }}&date={{ prev_date|date:'Y-m-d' }}" 
+                       class="btn btn-outline-secondary">
+                        &laquo;
+                    </a>
+                    <a href="?view={{ view_mode }}&date={% now 'Y-m-d' %}" 
+                       class="btn btn-outline-secondary">
+                        Сегодня
+                    </a>
+                    <a href="?view={{ view_mode }}&date={{ next_date|date:'Y-m-d' }}" 
+                       class="btn btn-outline-secondary">
+                        &raquo;
+                    </a>
+                </div>
+            </div>
+            
+            {% include "schedule/schedule_calendar.html" with schedule=schedule view_mode=view_mode current_date=current_date is_manager=True %}
+        </div>
+    </div>
+    
+    <!-- Add Schedule Entry Modal -->
+    <div class="modal fade" id="addScheduleModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить смену</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post" action="{% url 'create_schedule_entry' %}">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="date" class="form-label">Дата</label>
+                            <input type="date" class="form-control" id="date" name="date" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="employee" class="form-label">Сотрудник</label>
+                            <select class="form-select" id="employee" name="employee" required>
+                                <option value="">Выберите сотрудника</option>
+                                {% for employee in employees %}
+                                    <option value="{{ employee.id }}">{{ employee.full_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="equipment" class="form-label">Оборудование</label>
+                            <select class="form-select" id="equipment" name="equipment" required>
+                                <option value="">Выберите оборудование</option>
+                                {% for equipment in equipment_list %}
+                                    <option value="{{ equipment.id }}">{{ equipment.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="shift_type" class="form-label">Тип смены</label>
+                            <select class="form-select" id="shift_type" name="shift_type" required>
+                                <option value="">Выберите тип смены</option>
+                                <option value="morning">Утро (8:00-14:00)</option>
+                                <option value="evening">Вечер (14:00-20:00)</option>
+                                <option value="night">Ночь (14:00-8:00)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Добавить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add button to add new schedule entry
+        const calendarContainer = document.querySelector('.schedule-calendar');
+        const addButton = document.createElement('button');
+        addButton.className = 'btn btn-success position-fixed';
+        addButton.style.bottom = '30px';
+        addButton.style.right = '30px';
+        addButton.style.borderRadius = '50%';
+        addButton.style.width = '60px';
+        addButton.style.height = '60px';
+        addButton.style.fontSize = '24px';
+        addButton.innerHTML = '+';
+        addButton.setAttribute('data-bs-toggle', 'modal');
+        addButton.setAttribute('data-bs-target', '#addScheduleModal');
+        document.body.appendChild(addButton);
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Моё расписание | Расписание Областной Больницы{% endblock %}
+
+{% block content %}
+<div class="employee-schedule">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Моё расписание</h2>
+        <a href="{% url 'time_off_request_new' %}" class="btn btn-primary">
+            Запросить отгул
+        </a>
+    </div>
+    
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="btn-group">
+                    <a href="?view=month&date={{ current_date|date:'Y-m-d' }}" 
+                       class="btn {% if view_mode == 'month' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        Месяц
+                    </a>
+                    <a href="?view=week&date={{ current_date|date:'Y-m-d' }}" 
+                       class="btn {% if view_mode == 'week' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        Неделя
+                    </a>
+                </div>
+                
+                <h3 class="mb-0">{{ header_text }}</h3>
+                
+                <div class="btn-group">
+                    <a href="?view={{ view_mode }}&date={{ prev_date|date:'Y-m-d' }}" 
+                       class="btn btn-outline-secondary">
+                        &laquo;
+                    </a>
+                    <a href="?view={{ view_mode }}&date={% now 'Y-m-d' %}" 
+                       class="btn btn-outline-secondary">
+                        Сегодня
+                    </a>
+                    <a href="?view={{ view_mode }}&date={{ next_date|date:'Y-m-d' }}" 
+                       class="btn btn-outline-secondary">
+                        &raquo;
+                    </a>
+                </div>
+            </div>
+            
+            {% include "schedule/schedule_calendar.html" with schedule=schedule view_mode=view_mode current_date=current_date is_manager=False %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Any additional JavaScript for the employee schedule page
+    });
+</script>
+{% endblock %}

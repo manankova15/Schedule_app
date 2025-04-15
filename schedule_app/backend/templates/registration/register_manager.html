@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}Регистрация Старшей{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Регистрация Старшей</h4>
+                </div>
+                <div class="card-body">
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <p>Пожалуйста, исправьте следующие ошибки:</p>
+                        <ul>
+                            {% for field in form %}
+                                {% for error in field.errors %}
+                                    <li>{{ field.label }}: {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="id_email" class="form-label">Email</label>
+                            <input type="email" name="email" class="form-control {% if form.email.errors %}is-invalid{% endif %}" id="id_email" required value="{{ form.email.value|default:'' }}">
+                            {% if form.email.errors %}
+                            <div class="invalid-feedback">
+                                {{ form.email.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_password1" class="form-label">Пароль</label>
+                            <input type="password" name="password1" class="form-control {% if form.password1.errors %}is-invalid{% endif %}" id="id_password1" required>
+                            {% if form.password1.errors %}
+                            <div class="invalid-feedback">
+                                {{ form.password1.errors.0 }}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">
+                                <ul>
+                                    <li>Пароль не должен быть слишком похож на другую вашу личную информацию.</li>
+                                    <li>Пароль должен содержать не менее 8 символов.</li>
+                                    <li>Пароль не должен быть слишком простым и распространенным.</li>
+                                    <li>Пароль не может состоять только из цифр.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_password2" class="form-label">Подтверждение пароля</label>
+                            <input type="password" name="password2" class="form-control {% if form.password2.errors %}is-invalid{% endif %}" id="id_password2" required>
+                            {% if form.password2.errors %}
+                            <div class="invalid-feedback">
+                                {{ form.password2.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_manager_code" class="form-label">Код Старшей</label>
+                            <input type="password" name="manager_code" class="form-control {% if form.manager_code.errors %}is-invalid{% endif %}" id="id_manager_code" required>
+                            {% if form.manager_code.errors %}
+                            <div class="invalid-feedback">
+                                {{ form.manager_code.errors.0 }}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Введите специальный код для регистрации в качестве Старшей. Этот код можно получить у администратора системы.
+                            </div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-center">
+                    <p class="mb-0">Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

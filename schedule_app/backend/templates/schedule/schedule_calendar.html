@@ -1,0 +1,89 @@
+<div class="schedule-calendar">
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                {% for day_name in day_names %}
+                    <th class="text-center">{{ day_name }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in calendar_rows %}
+                <tr style="height: {% if view_mode == 'week' %}150px{% else %}auto{% endif %}">
+                    {% for cell in row %}
+                        <td class="position-relative 
+                            {% if not cell.is_current_month %}text-muted bg-light{% endif %} 
+                            {% if cell.is_today %}bg-info-subtle{% endif %}">
+                            
+                            {% if cell.date %}
+                                <div class="text-end">
+                                    {{ cell.date.day }}
+                                </div>
+                                
+                                <div class="mt-1">
+                                    {% if cell.shifts %}
+                                        {% for shift in cell.shifts %}
+                                            <div class="badge bg-{{ shift.color }} d-block mb-1 text-start p-2 {% if is_manager %}cursor-pointer{% endif %}"
+                                                 {% if is_manager %}
+                                                 data-bs-toggle="modal" 
+                                                 data-bs-target="#shiftModal{{ shift.id }}"
+                                                 style="cursor: pointer;"
+                                                 {% endif %}>
+                                                <div>{{ shift.employee_name }}</div>
+                                                <div>{{ shift.equipment_name }}</div>
+                                                <small>{{ shift.shift_label }} ({{ shift.shift_time }})</small>
+                                            </div>
+                                            
+                                            {% if is_manager %}
+                                                <!-- Shift Details Modal -->
+                                                <div class="modal fade" id="shiftModal{{ shift.id }}" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title">Детали смены</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <p><strong>Дата:</strong> {{ shift.date|date:"d.m.Y" }}</p>
+                                                                <p><strong>Сотрудник:</strong> {{ shift.employee_name }}</p>
+                                                                <p><strong>Оборудование:</strong> {{ shift.equipment_name }}</p>
+                                                                <p>
+                                                                    <strong>Смена:</strong> {{ shift.shift_label }}
+                                                                    ({{ shift.shift_time }})
+                                                                </p>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <form method="post" action="{% url 'delete_schedule_entry' shift.id %}">
+                                                                    {% csrf_token %}
+                                                                    <button type="submit" class="btn btn-danger">Удалить</button>
+                                                                </form>
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="text-center text-muted small">
+                                            {% if cell.is_current_month %}Нет смен{% endif %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="mt-3">
+        <h5>Условные обозначения:</h5>
+        <div class="d-flex flex-wrap gap-3">
+            <div><span class="badge bg-success">⬤</span> Утренняя смена (8:00-14:00)</div>
+            <div><span class="badge bg-primary">⬤</span> Вечерняя смена (14:00-20:00)</div>
+            <div><span class="badge bg-danger">⬤</span> Ночная смена (14:00-8:00)</div>
+        </div>
+    </div>
+</div>

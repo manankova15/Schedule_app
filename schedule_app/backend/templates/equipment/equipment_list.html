@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+
+{% block title %}Оборудование | Расписание Областной Больницы{% endblock %}
+
+{% block content %}
+<div class="equipment-list">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Оборудование</h2>
+        <button 
+            class="btn btn-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#addEquipmentModal"
+        >
+            Добавить оборудование
+        </button>
+    </div>
+    
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            {% if equipment_list %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Название</th>
+                                <th>Тип оборудования</th>
+                                <th>Утренняя смена</th>
+                                <th>Вечерняя смена</th>
+                                <th>Ночная смена</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for equipment in equipment_list %}
+                                <tr>
+                                    <td>{{ equipment.name }}</td>
+                                    <td>{{ equipment.get_equipment_type_display }}</td>
+                                    <td>
+                                        {% if equipment.shift_morning %}
+                                            <span class="badge bg-success">Да</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Нет</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if equipment.shift_evening %}
+                                            <span class="badge bg-success">Да</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Нет</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if equipment.shift_night %}
+                                            <span class="badge bg-success">Да</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Нет</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button 
+                                                class="btn btn-outline-primary"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editEquipmentModal{{ equipment.id }}"
+                                            >
+                                                Изменить
+                                            </button>
+                                            <button 
+                                                class="btn btn-outline-danger"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#deleteEquipmentModal{{ equipment.id }}"
+                                            >
+                                                Удалить
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Edit Equipment Modal -->
+                                <div class="modal fade" id="editEquipmentModal{{ equipment.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Редактировать оборудование</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <form method="post" action="{% url 'update_equipment' equipment.id %}">
+                                                {% csrf_token %}
+                                                <div class="modal-body">
+                                                    <div class="mb-3">
+                                                        <label for="name{{ equipment.id }}" class="form-label">Название</label>
+                                                        <input type="text" class="form-control" id="name{{ equipment.id }}" name="name" value="{{ equipment.name }}" required>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        <label for="equipment_type{{ equipment.id }}" class="form-label">Тип оборудования</label>
+                                                        <select class="form-select" id="equipment_type{{ equipment.id }}" name="equipment_type" required>
+                                                            <option value="mrt" {% if equipment.equipment_type == 'mrt' %}selected{% endif %}>МРТ</option>
+                                                            <option value="rkt_ge" {% if equipment.equipment_type == 'rkt_ge' %}selected{% endif %}>РКТ GE (128 срезовый)</option>
+                                                            <option value="rkt_toshiba" {% if equipment.equipment_type == 'rkt_toshiba' %}selected{% endif %}>Тошиба (РКТ 64 срезовый)</option>
+                                                        </select>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox" id="shift_morning{{ equipment.id }}" name="shift_morning" {% if equipment.shift_morning %}checked{% endif %}>
+                                                            <label class="form-check-label" for="shift_morning{{ equipment.id }}">Утренняя смена (8:00-14:00)</label>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox" id="shift_evening{{ equipment.id }}" name="shift_evening" {% if equipment.shift_evening %}checked{% endif %}>
+                                                            <label class="form-check-label" for="shift_evening{{ equipment.id }}">Вечерняя смена (14:00-20:00)</label>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox" id="shift_night{{ equipment.id }}" name="shift_night" {% if equipment.shift_night %}checked{% endif %}>
+                                                            <label class="form-check-label" for="shift_night{{ equipment.id }}">Ночная смена (14:00-8:00)</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Delete Equipment Modal -->
+                                <div class="modal fade" id="deleteEquipmentModal{{ equipment.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Удалить оборудование</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p>Вы уверены, что хотите удалить оборудование "{{ equipment.name }}"?</p>
+                                                <p class="text-danger">Это действие нельзя отменить. Все связанные данные (расписание, навыки сотрудников) также будут удалены.</p>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                                <form method="post" action="{% url 'delete_equipment' equipment.id %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-danger">Удалить</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    Оборудование не найдено. Добавьте новое оборудование, нажав на кнопку "Добавить оборудование".
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Add Equipment Modal -->
+    <div class="modal fade" id="addEquipmentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить оборудование</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post" action="{% url 'create_equipment' %}">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="name_new" class="form-label">Название</label>
+                            <input type="text" class="form-control" id="name_new" name="name" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="equipment_type_new" class="form-label">Тип оборудования</label>
+                            <select class="form-select" id="equipment_type_new" name="equipment_type" required>
+                                <option value="mrt">МРТ</option>
+                                <option value="rkt_ge">РКТ GE (128 срезовый)</option>
+                                <option value="rkt_toshiba">Тошиба (РКТ 64 срезовый)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="shift_morning_new" name="shift_morning" checked>
+                                <label class="form-check-label" for="shift_morning_new">Утренняя смена (8:00-14:00)</label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="shift_evening_new" name="shift_evening" checked>
+                                <label class="form-check-label" for="shift_evening_new">Вечерняя смена (14:00-20:00)</label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="shift_night_new" name="shift_night">
+                                <label class="form-check-label" for="shift_night_new">Ночная смена (14:00-8:00)</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Добавить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
