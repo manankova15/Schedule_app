@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from django.db.models import Q
+import random
 
 from api.models import (
     Employee, Equipment, Schedule, EmployeeEquipmentSkill, TimeOffRequest
@@ -12,6 +13,54 @@ from api.models import (
 from .views import is_manager, manager_required, generate_calendar_days, get_shift_info
 
 User = get_user_model()
+
+def get_available_employees(employees, date, shift_type, equipment):
+    """Get available employees for a specific date, shift and equipment"""
+    # Filter employees who have the skills to work on this equipment
+    skilled_employees = []
+    for employee in employees:
+        skills = EmployeeEquipmentSkill.objects.filter(employee=employee, equipment=equipment)
+        if skills.exists():
+            skilled_employees.append(employee)
+    
+    # Filter out employees who already have a schedule for this date
+    available_employees = []
+    for employee in skilled_employees:
+        # Check if employee has a time off request for this date
+        time_off_requests = TimeOffRequest.objects.filter(
+            employee=employee,
+            start_date__lte=date,
+            end_date__gte=date,
+            status='approved'
+        )
+        
+        if time_off_requests.exists():
+            continue
+        
+        # Check if employee already has a schedule for this date
+        schedules = Schedule.objects.filter(employee=employee, date=date)
+        if schedules.exists():
+            continue
+        
+        # Check if employee worked the day before (to avoid consecutive shifts)
+        if employee.last_work_day_prev_month:
+            if date == datetime(date.year, date.month, 1).date() and employee.last_work_day_prev_month == datetime(date.year, date.month - 1 if date.month > 1 else 12, 1).date().replace(day=1).replace(day=28):
+                continue
+        
+        prev_day_schedules = Schedule.objects.filter(employee=employee, date=date - timedelta(days=1))
+        if prev_day_schedules.exists():
+            continue
+        
+        # Check if employee's shift availability allows this shift
+        if employee.shift_availability == 'morning_only' and shift_type != 'morning':
+            continue
+        
+        if employee.shift_availability == 'day_only' and shift_type == 'night':
+            continue
+        
+        available_employees.append(employee)
+    
+    return available_employees
 
 @login_required
 @manager_required
@@ -150,16 +199,65 @@ def schedule_generator(request):
                 if end_date < start_date:
                     error = "Дата окончания не может быть раньше даты начала"
                 else:
-                    # Calculate date range
                     diff_days = (end_date - start_date).days + 1
                     
                     if diff_days > 31:
                         error = "Период не должен превышать 31 день"
                     else:
-                        # Generate schedule
-                        from api.views import ScheduleViewSet
-                        schedule_viewset = ScheduleViewSet()
-                        schedule_viewset.generate_schedule(start_date, end_date)
+                        # Implement schedule generation directly
+                        
+                        # Delete existing schedules in the date range
+                        Schedule.objects.filter(date__gte=start_date, date__lte=end_date).delete()
+                        
+                        # Get all employees and equipment
+                        employees = Employee.objects.all()
+                        equipment_list = Equipment.objects.all()
+                        
+                        # Generate schedule for each day
+                        current_date = start_date
+                        while current_date <= end_date:
+                            # For each equipment
+                            for equipment in equipment_list:
+                                # Morning shift (8:00-14:00)
+                                if equipment.shift_morning:
+                                    # Find employees who can work on this equipment in the morning
+                                    available_employees = get_available_employees(employees, current_date, 'morning', equipment)
+                                    if available_employees:
+                                        employee = random.choice(available_employees)
+                                        Schedule.objects.create(
+                                            employee=employee,
+                                            equipment=equipment,
+                                            date=current_date,
+                                            shift_type='morning'
+                                        )
+                                
+                                # Evening shift (14:00-20:00)
+                                if equipment.shift_evening:
+                                    # Find employees who can work on this equipment in the evening
+                                    available_employees = get_available_employees(employees, current_date, 'evening', equipment)
+                                    if available_employees:
+                                        employee = random.choice(available_employees)
+                                        Schedule.objects.create(
+                                            employee=employee,
+                                            equipment=equipment,
+                                            date=current_date,
+                                            shift_type='evening'
+                                        )
+                                
+                                # Night shift (20:00-8:00)
+                                if equipment.shift_night:
+                                    # Find employees who can work on this equipment at night
+                                    available_employees = get_available_employees(employees, current_date, 'night', equipment)
+                                    if available_employees:
+                                        employee = random.choice(available_employees)
+                                        Schedule.objects.create(
+                                            employee=employee,
+                                            equipment=equipment,
+                                            date=current_date,
+                                            shift_type='night'
+                                        )
+                            
+                            current_date += timedelta(days=1)
                         
                         success = True
                         messages.success(request, "Расписание успешно сгенерировано!")

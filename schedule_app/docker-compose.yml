@@ -1,5 +1,4 @@
 services:
-  # PostgreSQL Database
   db:
     image: postgres:15-alpine
     volumes:
@@ -45,17 +44,6 @@ services:
     container_name: backend
     restart: always
     working_dir: /app
-
-  # Nginx Frontend
-  frontend:
-    build: ./frontend
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
-    networks:
-      - app-network
-    restart: always
 
 networks:
   app-network:

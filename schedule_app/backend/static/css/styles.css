@@ -1,6 +1,5 @@
 /* Custom styles for the hospital schedule application */
 
-/* General styles */
 body {
     min-height: 100vh;
     display: flex;
@@ -15,7 +14,6 @@ footer {
     margin-top: auto;
 }
 
-/* Schedule calendar styles */
 .schedule-calendar .table th {
     background-color: #f8f9fa;
     text-align: center;
@@ -32,13 +30,11 @@ footer {
     background-color: rgba(13, 202, 240, 0.1) !important;
 }
 
-/* Badge styles for shifts */
 .badge.bg-success, .badge.bg-primary, .badge.bg-danger {
     font-weight: normal;
     text-align: left;
 }
 
-/* Form styles */
 .form-label {
     font-weight: 500;
 }
@@ -47,12 +43,10 @@ footer {
     font-size: 0.85rem;
 }
 
-/* Modal styles */
 .modal-header {
     background-color: #f8f9fa;
 }
 
-/* Card styles */
 .card {
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
     border: none;
@@ -62,7 +56,6 @@ footer {
     color: #0d6efd;
 }
 
-/* Table styles */
 .table-hover tbody tr:hover {
     background-color: rgba(13, 110, 253, 0.05);
 }
@@ -82,12 +75,10 @@ footer {
     border-bottom-right-radius: 0.25rem;
 }
 
-/* Alert styles */
 .alert {
     border: none;
 }
 
-/* Badge styles */
 .badge {
     font-weight: 500;
 }
