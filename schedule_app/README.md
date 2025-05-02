@@ -47,33 +47,47 @@ schedule_app/
 
 ## Установка и запуск
 
-### С использованием Docker
+### С использованием Docker или Podman
 
-1. Убедитесь, что у вас установлены Docker и Docker Compose
+1. Установите Docker или Podman и Podman Compose
 2. Клонируйте репозиторий
-3. Файл `.env` уже создан с необходимыми переменными окружения
+3. Создайте `.env` файл по аналогии с .env.example
+
+Далее при использовании Docker вместо Podman прописывайте стандартные команды (например, docker-compose up -d --build)
+
 4. Остановите существующие контейнеры, если они запущены:
 
 ```bash
-docker-compose down
+podman-compose down
+```
+Если podman-compose недоступен, установите его:
+
+```bash
+pip install podman-compose
+```
+
+или
+
+```bash
+brew install podman-compose
 ```
 
 5. Запустите приложение:
 
 ```bash
-docker-compose up -d --build
+podman-compose up -d --build
 ```
 
 6. Проверьте статус контейнеров:
 
 ```bash
-docker-compose ps
+podman-compose ps
 ```
 
 7. Если контейнер backend не запущен, проверьте логи:
 
 ```bash
-docker-compose logs backend
+podman-compose logs backend
 ```
 
 8. Приложение будет доступно по адресу: http://localhost:8000 или http://localhost
