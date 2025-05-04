@@ -8,9 +8,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('Starting database initialization...'))
         
-        # Create tables directly if they don't exist
         with connection.cursor() as cursor:
-            # Check if auth_user table exists
             cursor.execute("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
@@ -22,7 +20,6 @@ class Command(BaseCommand):
             if not auth_user_exists:
                 self.stdout.write(self.style.WARNING('auth_user table does not exist, creating it...'))
                 
-                # Create auth_user table
                 cursor.execute("""
                     CREATE TABLE "auth_user" (
                         "id" serial NOT NULL PRIMARY KEY,
@@ -39,7 +36,6 @@ class Command(BaseCommand):
                     );
                 """)
                 
-                # Create auth_group table
                 cursor.execute("""
                     CREATE TABLE "auth_group" (
                         "id" serial NOT NULL PRIMARY KEY,
@@ -47,7 +43,6 @@ class Command(BaseCommand):
                     );
                 """)
                 
-                # Create auth_permission table
                 cursor.execute("""
                     CREATE TABLE "auth_permission" (
                         "id" serial NOT NULL PRIMARY KEY,
@@ -58,7 +53,6 @@ class Command(BaseCommand):
                     );
                 """)
                 
-                # Create auth_group_permissions table
                 cursor.execute("""
                     CREATE TABLE "auth_group_permissions" (
                         "id" serial NOT NULL PRIMARY KEY,
@@ -68,7 +62,6 @@ class Command(BaseCommand):
                     );
                 """)
                 
-                # Create auth_user_groups table
                 cursor.execute("""
                     CREATE TABLE "auth_user_groups" (
                         "id" serial NOT NULL PRIMARY KEY,
@@ -78,7 +71,6 @@ class Command(BaseCommand):
                     );
                 """)
                 
-                # Create auth_user_user_permissions table
                 cursor.execute("""
                     CREATE TABLE "auth_user_user_permissions" (
                         "id" serial NOT NULL PRIMARY KEY,
@@ -88,7 +80,6 @@ class Command(BaseCommand):
                     );
                 """)
                 
-                # Create django_content_type table
                 cursor.execute("""
                     CREATE TABLE "django_content_type" (
                         "id" serial NOT NULL PRIMARY KEY,
@@ -98,7 +89,6 @@ class Command(BaseCommand):
                     );
                 """)
                 
-                # Create django_migrations table
                 cursor.execute("""
                     CREATE TABLE "django_migrations" (
                         "id" serial NOT NULL PRIMARY KEY,
@@ -108,7 +98,6 @@ class Command(BaseCommand):
                     );
                 """)
                 
-                # Create django_session table
                 cursor.execute("""
                     CREATE TABLE "django_session" (
                         "session_key" varchar(40) NOT NULL PRIMARY KEY,
@@ -119,11 +108,9 @@ class Command(BaseCommand):
                 
                 self.stdout.write(self.style.SUCCESS('Basic auth tables created successfully!'))
         
-        # Run migrations to create other tables and update existing ones
         self.stdout.write(self.style.WARNING('Running migrations...'))
         call_command('migrate', '--noinput')
         
-        # Create superuser
         self.stdout.write(self.style.WARNING('Creating superuser...'))
         from django.contrib.auth.models import User
         if not User.objects.filter(username='admin').exists():
@@ -132,4 +119,105 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.SUCCESS('Superuser already exists.'))
         
+        # Create test employees
+        self.stdout.write(self.style.WARNING('Creating test employees...'))
+        
+        from api.models import CustomUser, Employee, Equipment, EmployeeEquipmentSkill
+        
+        # Create equipment if it doesn't exist
+        equipment_data = [
+            {'name': 'МРТ аппарат 1', 'equipment_type': 'mrt'},
+            {'name': 'РКТ GE аппарат', 'equipment_type': 'rkt_ge'},
+            {'name': 'Тошиба РКТ аппарат', 'equipment_type': 'rkt_toshiba'}
+        ]
+        
+        equipment_objects = []
+        for data in equipment_data:
+            equipment, created = Equipment.objects.get_or_create(
+                name=data['name'],
+                defaults={
+                    'equipment_type': data['equipment_type'],
+                    'shift_morning': True,
+                    'shift_evening': True,
+                    'shift_night': data['equipment_type'] == 'mrt'  # Only MRT works at night
+                }
+            )
+            equipment_objects.append(equipment)
+            if created:
+                self.stdout.write(self.style.SUCCESS(f'Created equipment: {equipment.name}'))
+            else:
+                self.stdout.write(self.style.SUCCESS(f'Equipment already exists: {equipment.name}'))
+        
+        # Create test employees
+        employee_data = [
+            {'email': 'ivanov@hospital.ru', 'password': 'employee123', 'full_name': 'Иванов Иван Иванович', 'role': 'staff'},
+            {'email': 'petrova@hospital.ru', 'password': 'employee123', 'full_name': 'Петрова Мария Сергеевна', 'role': 'staff'},
+            {'email': 'sidorov@hospital.ru', 'password': 'employee123', 'full_name': 'Сидоров Алексей Петрович', 'role': 'staff'},
+            {'email': 'kuznetsova@hospital.ru', 'password': 'employee123', 'full_name': 'Кузнецова Елена Александровна', 'role': 'staff'},
+            {'email': 'smirnov@hospital.ru', 'password': 'employee123', 'full_name': 'Смирнов Дмитрий Николаевич', 'role': 'staff'},
+            {'email': 'popova@hospital.ru', 'password': 'employee123', 'full_name': 'Попова Ольга Владимировна', 'role': 'staff'},
+            {'email': 'sokolov@hospital.ru', 'password': 'employee123', 'full_name': 'Соколов Андрей Михайлович', 'role': 'staff'},
+            {'email': 'novikova@hospital.ru', 'password': 'employee123', 'full_name': 'Новикова Татьяна Игоревна', 'role': 'staff'},
+            {'email': 'volkov@hospital.ru', 'password': 'employee123', 'full_name': 'Волков Сергей Анатольевич', 'role': 'staff'},
+            {'email': 'morozova@hospital.ru', 'password': 'employee123', 'full_name': 'Морозова Наталья Викторовна', 'role': 'staff'},
+            {'email': 'manager@hospital.ru', 'password': 'manager123', 'full_name': 'Главная Старшая', 'role': 'manager'}
+        ]
+        
+        created_employees = []
+        for data in employee_data:
+            if not CustomUser.objects.filter(email=data['email']).exists():
+                user = CustomUser.objects.create_user(
+                    email=data['email'],
+                    password=data['password'],
+                    is_staff=data['role'] == 'manager'
+                )
+                
+                employee = Employee.objects.create(
+                    user=user,
+                    full_name=data['full_name'],
+                    email=data['email'],
+                    role=data['role'],
+                    rate=1.5 if data['email'] in ['ivanov@hospital.ru', 'petrova@hospital.ru', 'manager@hospital.ru'] else 1.0,
+                    shift_availability='all_shifts'
+                )
+                
+                created_employees.append(employee)
+                self.stdout.write(self.style.SUCCESS(f'Created employee: {employee.full_name}'))
+            else:
+                self.stdout.write(self.style.SUCCESS(f'Employee already exists: {data["email"]}'))
+        
+        # Assign equipment skills to employees
+        for employee in created_employees:
+            if employee.role == 'staff':
+                # Assign primary skill to first equipment
+                EmployeeEquipmentSkill.objects.get_or_create(
+                    employee=employee,
+                    equipment=equipment_objects[0],
+                    defaults={'skill_level': 'primary'}
+                )
+                
+                # Assign secondary skill to second equipment for some employees
+                if employee.email in ['ivanov@hospital.ru', 'petrova@hospital.ru', 'sidorov@hospital.ru', 'kuznetsova@hospital.ru', 'smirnov@hospital.ru']:
+                    EmployeeEquipmentSkill.objects.get_or_create(
+                        employee=employee,
+                        equipment=equipment_objects[1],
+                        defaults={'skill_level': 'secondary'}
+                    )
+                
+                # Assign secondary skill to third equipment for some other employees
+                if employee.email in ['popova@hospital.ru', 'sokolov@hospital.ru', 'novikova@hospital.ru', 'volkov@hospital.ru', 'morozova@hospital.ru']:
+                    EmployeeEquipmentSkill.objects.get_or_create(
+                        employee=employee,
+                        equipment=equipment_objects[2],
+                        defaults={'skill_level': 'secondary'}
+                    )
+        
+        self.stdout.write(self.style.SUCCESS('Test employees created successfully!'))
         self.stdout.write(self.style.SUCCESS('Database initialization completed successfully!'))
+        
+        # Print login credentials for testing
+        self.stdout.write(self.style.SUCCESS('\nTest login credentials:'))
+        self.stdout.write(self.style.SUCCESS('Manager: manager@hospital.ru / manager123'))
+        for data in employee_data:
+            if data['role'] == 'staff':
+                self.stdout.write(self.style.SUCCESS(f'Employee: {data["email"]} / {data["password"]}'))

@@ -44,8 +44,31 @@ def get_available_employees(employees, date, shift_type, equipment):
         
         # Check if employee worked the day before (to avoid consecutive shifts)
         if employee.last_work_day_prev_month:
-            if date == datetime(date.year, date.month, 1).date() and employee.last_work_day_prev_month == datetime(date.year, date.month - 1 if date.month > 1 else 12, 1).date().replace(day=1).replace(day=28):
-                continue
+            # Check if this is the first day of the month and the employee worked on the last day of the previous month
+            if date.day == 1:
+                # Get the last day of the previous month
+                if date.month == 1:  # January
+                    prev_month_year = date.year - 1
+                    prev_month = 12  # December
+                else:
+                    prev_month_year = date.year
+                    prev_month = date.month - 1
+                
+                # Calculate the last day of the previous month
+                if prev_month in [4, 6, 9, 11]:  # 30 days
+                    last_day = 30
+                elif prev_month == 2:  # February
+                    # Check for leap year
+                    if prev_month_year % 4 == 0 and (prev_month_year % 100 != 0 or prev_month_year % 400 == 0):
+                        last_day = 29
+                    else:
+                        last_day = 28
+                else:  # 31 days
+                    last_day = 31
+                
+                # Check if the employee's last work day in the previous month was the last day of that month
+                if employee.last_work_day_prev_month.month == prev_month and employee.last_work_day_prev_month.day == last_day:
+                    continue
         
         prev_day_schedules = Schedule.objects.filter(employee=employee, date=date - timedelta(days=1))
         if prev_day_schedules.exists():

@@ -29,16 +29,6 @@ class CustomUserCreationForm(UserCreationForm):
             user.save()
         return user
 
-class ManagerRegistrationForm(CustomUserCreationForm):
-    manager_code = forms.CharField(
-        label="Код Старшей",
-        strip=False,
-        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
-    )
-    
-    class Meta(CustomUserCreationForm.Meta):
-        fields = CustomUserCreationForm.Meta.fields + ('manager_code',)
-
 class EmployeeRegistrationForm(CustomUserCreationForm):
     full_name = forms.CharField(
         label="ФИО",
@@ -51,9 +41,25 @@ class EmployeeRegistrationForm(CustomUserCreationForm):
         required=False,
         widget=forms.TextInput(attrs={'class': 'form-control'}),
     )
+    registration_code = forms.CharField(
+        label="Код регистрации",
+        strip=False,
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+    )
     
     class Meta(CustomUserCreationForm.Meta):
-        fields = CustomUserCreationForm.Meta.fields + ('full_name', 'phone')
+        fields = CustomUserCreationForm.Meta.fields + ('full_name', 'phone', 'registration_code')
+
+# Keep this for backward compatibility but it's no longer used
+class ManagerRegistrationForm(CustomUserCreationForm):
+    manager_code = forms.CharField(
+        label="Код Старшей",
+        strip=False,
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+    )
+    
+    class Meta(CustomUserCreationForm.Meta):
+        fields = CustomUserCreationForm.Meta.fields + ('manager_code',)
 
 class CustomPasswordResetForm(PasswordResetForm):
     email = forms.EmailField(

@@ -19,7 +19,6 @@ services:
     networks:
       - app-network
 
-  # Django Backend
   backend:
     build: ./backend
     volumes:

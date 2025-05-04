@@ -28,6 +28,7 @@ from .forms import (
 User = get_user_model()
 
 MANAGER_REGISTRATION_CODE = "manager123"
+EMPLOYEE_REGISTRATION_CODE = "employee123"
 
 def is_manager(user):
     if not hasattr(user, 'employee'):
@@ -51,23 +52,32 @@ def logout_view(request):
 def register(request):
     if request.method == 'POST':
         form = EmployeeRegistrationForm(request.POST)
+        registration_code = request.POST.get('registration_code')
+        role = 'staff'
+        
+        if registration_code == MANAGER_REGISTRATION_CODE:
+            role = 'manager'
+        elif registration_code != EMPLOYEE_REGISTRATION_CODE:
+            messages.error(request, "Неверный код регистрации. Пожалуйста, проверьте код и попробуйте снова.")
+            return render(request, 'registration/register.html', {'form': form})
+        
         if form.is_valid():
             user = form.save()
             
+            full_name = form.cleaned_data.get('full_name') if role == 'staff' else user.email
+            
             Employee.objects.create(
                 user=user,
-                full_name=form.cleaned_data.get('full_name'),
+                full_name=full_name,
                 email=user.email,
-                phone=form.cleaned_data.get('phone'),
-                role='staff'
+                phone=form.cleaned_data.get('phone') if role == 'staff' else None,
+                role=role
             )
             
             email = form.cleaned_data.get('email')
             password = form.cleaned_data.get('password1')
             user = authenticate(email=email, password=password)
             login(request, user)
-            
-            messages.success(request, f"Аккаунт создан для {email}!")
             return redirect('home')
     else:
         form = EmployeeRegistrationForm()
@@ -75,35 +85,8 @@ def register(request):
     return render(request, 'registration/register.html', {'form': form})
 
 def register_manager(request):
-    if request.method == 'POST':
-        form = ManagerRegistrationForm(request.POST)
-        manager_code = request.POST.get('manager_code')
-        
-        if manager_code != MANAGER_REGISTRATION_CODE:
-            messages.error(request, "Неверный код Старшей. Пожалуйста, проверьте код и попробуйте снова.")
-            return render(request, 'registration/register_manager.html', {'form': form})
-        
-        if form.is_valid():
-            user = form.save()
-            
-            Employee.objects.create(
-                user=user,
-                full_name=user.email,
-                email=user.email,
-                role='manager'
-            )
-            
-            email = form.cleaned_data.get('email')
-            password = form.cleaned_data.get('password1')
-            user = authenticate(email=email, password=password)
-            login(request, user)
-            
-            messages.success(request, f"Аккаунт Старшей создан для {email}!")
-            return redirect('home')
-    else:
-        form = ManagerRegistrationForm()
-    
-    return render(request, 'registration/register_manager.html', {'form': form})
+    # Redirect to the unified registration page
+    return redirect('register')
 
 @login_required
 def profile(request):

@@ -64,21 +64,15 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         except ValueError:
             return Response({"error": "Invalid date format"}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Delete existing schedules in the date range
         Schedule.objects.filter(date__gte=start_date, date__lte=end_date).delete()
         
-        # Get all employees and equipment
         employees = Employee.objects.all()
         equipment_list = Equipment.objects.all()
         
-        # Generate schedule for each day
         current_date = start_date
         while current_date <= end_date:
-            # For each equipment
             for equipment in equipment_list:
-                # Morning shift (8:00-14:00)
                 if equipment.shift_morning:
-                    # Find employees who can work on this equipment in the morning
                     available_employees = self._get_available_employees(employees, current_date, 'morning', equipment)
                     if available_employees:
                         employee = random.choice(available_employees)
@@ -89,9 +83,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                             shift_type='morning'
                         )
                 
-                # Evening shift (14:00-20:00)
                 if equipment.shift_evening:
-                    # Find employees who can work on this equipment in the evening
                     available_employees = self._get_available_employees(employees, current_date, 'evening', equipment)
                     if available_employees:
                         employee = random.choice(available_employees)
@@ -102,9 +94,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                             shift_type='evening'
                         )
                 
-                # Night shift (20:00-8:00)
                 if equipment.shift_night:
-                    # Find employees who can work on this equipment at night
                     available_employees = self._get_available_employees(employees, current_date, 'night', equipment)
                     if available_employees:
                         employee = random.choice(available_employees)
@@ -121,17 +111,14 @@ class ScheduleViewSet(viewsets.ModelViewSet):
     
     def _get_available_employees(self, employees, date, shift_type, equipment):
         """Get available employees for a specific date, shift and equipment"""
-        # Filter employees who have the skills to work on this equipment
         skilled_employees = []
         for employee in employees:
             skills = EmployeeEquipmentSkill.objects.filter(employee=employee, equipment=equipment)
             if skills.exists():
                 skilled_employees.append(employee)
         
-        # Filter out employees who already have a schedule for this date
         available_employees = []
         for employee in skilled_employees:
-            # Check if employee has a time off request for this date
             time_off_requests = TimeOffRequest.objects.filter(
                 employee=employee,
                 start_date__lte=date,
@@ -142,15 +129,36 @@ class ScheduleViewSet(viewsets.ModelViewSet):
             if time_off_requests.exists():
                 continue
             
-            # Check if employee already has a schedule for this date
             schedules = Schedule.objects.filter(employee=employee, date=date)
             if schedules.exists():
                 continue
             
-            # Check if employee worked the day before (to avoid consecutive shifts)
             if employee.last_work_day_prev_month:
-                if date == datetime(date.year, date.month, 1).date() and employee.last_work_day_prev_month == datetime(date.year, date.month - 1 if date.month > 1 else 12, 1).date().replace(day=1).replace(day=28):
-                    continue
+                # Check if this is the first day of the month and the employee worked on the last day of the previous month
+                if date.day == 1:
+                    # Get the last day of the previous month
+                    if date.month == 1:  # January
+                        prev_month_year = date.year - 1
+                        prev_month = 12  # December
+                    else:
+                        prev_month_year = date.year
+                        prev_month = date.month - 1
+                    
+                    # Calculate the last day of the previous month
+                    if prev_month in [4, 6, 9, 11]:  # 30 days
+                        last_day = 30
+                    elif prev_month == 2:  # February
+                        # Check for leap year
+                        if prev_month_year % 4 == 0 and (prev_month_year % 100 != 0 or prev_month_year % 400 == 0):
+                            last_day = 29
+                        else:
+                            last_day = 28
+                    else:  # 31 days
+                        last_day = 31
+                    
+                    # Check if the employee's last work day in the previous month was the last day of that month
+                    if employee.last_work_day_prev_month.month == prev_month and employee.last_work_day_prev_month.day == last_day:
+                        continue
             
             prev_day_schedules = Schedule.objects.filter(employee=employee, date=date - timedelta(days=1))
             if prev_day_schedules.exists():
