@@ -134,29 +134,24 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                 continue
             
             if employee.last_work_day_prev_month:
-                # Check if this is the first day of the month and the employee worked on the last day of the previous month
                 if date.day == 1:
-                    # Get the last day of the previous month
-                    if date.month == 1:  # January
+                    if date.month == 1: 
                         prev_month_year = date.year - 1
-                        prev_month = 12  # December
+                        prev_month = 12  
                     else:
                         prev_month_year = date.year
                         prev_month = date.month - 1
                     
-                    # Calculate the last day of the previous month
-                    if prev_month in [4, 6, 9, 11]:  # 30 days
+                    if prev_month in [4, 6, 9, 11]:
                         last_day = 30
-                    elif prev_month == 2:  # February
-                        # Check for leap year
+                    elif prev_month == 2:
                         if prev_month_year % 4 == 0 and (prev_month_year % 100 != 0 or prev_month_year % 400 == 0):
                             last_day = 29
                         else:
                             last_day = 28
-                    else:  # 31 days
+                    else:  # 31 день
                         last_day = 31
                     
-                    # Check if the employee's last work day in the previous month was the last day of that month
                     if employee.last_work_day_prev_month.month == prev_month and employee.last_work_day_prev_month.day == last_day:
                         continue
             

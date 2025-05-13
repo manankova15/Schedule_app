@@ -30,21 +30,6 @@
 - **Database**: PostgreSQL
 - **Frontend**: Django Templates, Bootstrap 5, JavaScript
 
-## Структура проекта
-
-```
-schedule_app/
-├── backend/
-│   ├── api/                  # API приложение
-│   ├── hospital/             # Основное приложение Django
-│   ├── static/               # Статические файлы (CSS, JS)
-│   ├── templates/            # HTML шаблоны
-│   ├── manage.py             # Скрипт управления Django
-│   └── requirements.txt      # Зависимости Python
-├── docker-compose.yml        # Конфигурация Docker Compose
-└── README.md                 # Документация проекта
-```
-
 ## Установка и запуск
 
 ### С использованием Docker или Podman

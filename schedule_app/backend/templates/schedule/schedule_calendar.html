@@ -22,10 +22,12 @@
                                 
                                 <div class="mt-1">
                                     {% if cell.shifts %}
+                                        <!-- Morning shifts first -->
                                         {% for shift in cell.shifts %}
+                                            {% if shift.shift_type == 'morning' %}
                                             <div class="badge bg-{{ shift.color }} d-block mb-1 text-start p-2 {% if is_manager %}cursor-pointer{% endif %}"
                                                  {% if is_manager %}
-                                                 data-bs-toggle="modal" 
+                                                 data-bs-toggle="modal"
                                                  data-bs-target="#shiftModal{{ shift.id }}"
                                                  style="cursor: pointer;"
                                                  {% endif %}>
@@ -62,6 +64,99 @@
                                                         </div>
                                                     </div>
                                                 </div>
+                                            {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        
+                                        <!-- Evening shifts second -->
+                                        {% for shift in cell.shifts %}
+                                            {% if shift.shift_type == 'evening' %}
+                                            <div class="badge bg-{{ shift.color }} d-block mb-1 text-start p-2 {% if is_manager %}cursor-pointer{% endif %}"
+                                                 {% if is_manager %}
+                                                 data-bs-toggle="modal"
+                                                 data-bs-target="#shiftModal{{ shift.id }}"
+                                                 style="cursor: pointer;"
+                                                 {% endif %}>
+                                                <div>{{ shift.employee_name }}</div>
+                                                <div>{{ shift.equipment_name }}</div>
+                                                <small>{{ shift.shift_label }} ({{ shift.shift_time }})</small>
+                                            </div>
+                                            
+                                            {% if is_manager %}
+                                                <!-- Shift Details Modal -->
+                                                <div class="modal fade" id="shiftModal{{ shift.id }}" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title">Детали смены</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <p><strong>Дата:</strong> {{ shift.date|date:"d.m.Y" }}</p>
+                                                                <p><strong>Сотрудник:</strong> {{ shift.employee_name }}</p>
+                                                                <p><strong>Оборудование:</strong> {{ shift.equipment_name }}</p>
+                                                                <p>
+                                                                    <strong>Смена:</strong> {{ shift.shift_label }}
+                                                                    ({{ shift.shift_time }})
+                                                                </p>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <form method="post" action="{% url 'delete_schedule_entry' shift.id %}">
+                                                                    {% csrf_token %}
+                                                                    <button type="submit" class="btn btn-danger">Удалить</button>
+                                                                </form>
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        
+                                        <!-- Night shifts last -->
+                                        {% for shift in cell.shifts %}
+                                            {% if shift.shift_type == 'night' %}
+                                            <div class="badge bg-{{ shift.color }} d-block mb-1 text-start p-2 {% if is_manager %}cursor-pointer{% endif %}"
+                                                 {% if is_manager %}
+                                                 data-bs-toggle="modal"
+                                                 data-bs-target="#shiftModal{{ shift.id }}"
+                                                 style="cursor: pointer;"
+                                                 {% endif %}>
+                                                <div>{{ shift.employee_name }}</div>
+                                                <div>{{ shift.equipment_name }}</div>
+                                                <small>{{ shift.shift_label }} ({{ shift.shift_time }})</small>
+                                            </div>
+                                            
+                                            {% if is_manager %}
+                                                <!-- Shift Details Modal -->
+                                                <div class="modal fade" id="shiftModal{{ shift.id }}" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title">Детали смены</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <p><strong>Дата:</strong> {{ shift.date|date:"d.m.Y" }}</p>
+                                                                <p><strong>Сотрудник:</strong> {{ shift.employee_name }}</p>
+                                                                <p><strong>Оборудование:</strong> {{ shift.equipment_name }}</p>
+                                                                <p>
+                                                                    <strong>Смена:</strong> {{ shift.shift_label }}
+                                                                    ({{ shift.shift_time }})
+                                                                </p>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <form method="post" action="{% url 'delete_schedule_entry' shift.id %}">
+                                                                    {% csrf_token %}
+                                                                    <button type="submit" class="btn btn-danger">Удалить</button>
+                                                                </form>
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
                                             {% endif %}
                                         {% endfor %}
                                     {% else %}

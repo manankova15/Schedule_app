@@ -54,7 +54,11 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'home' %}">Расписание Областной Больницы</a>
+            {% if user.is_authenticated and user.employee.role == 'manager' %}
+                <a class="navbar-brand" href="{% url 'manager_schedule' %}">Расписание Областной Больницы</a>
+            {% else %}
+                <a class="navbar-brand" href="{% url 'home' %}">Расписание Областной Больницы</a>
+            {% endif %}
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -107,14 +111,8 @@
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}" href="{% url 'login' %}">Войти</a>
                         </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle {% if request.resolver_match.url_name == 'register' or request.resolver_match.url_name == 'register_manager' %}active{% endif %}" href="#" id="registerDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                Регистрация
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="registerDropdown">
-                                <li><a class="dropdown-item" href="{% url 'register' %}">Регистрация сотрудника</a></li>
-                                <li><a class="dropdown-item" href="{% url 'register_manager' %}">Регистрация Старшей</a></li>
-                            </ul>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'register' %}active{% endif %}" href="{% url 'register' %}">Регистрация</a>
                         </li>
                     {% endif %}
                 </ul>

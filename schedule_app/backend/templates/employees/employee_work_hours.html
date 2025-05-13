@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}Учет рабочих часов | Расписание Областной Больницы{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Учет рабочих часов сотрудников</h2>
+        <div>
+            <a href="{% url 'employees' %}" class="btn btn-outline-primary">
+                Список сотрудников
+            </a>
+        </div>
+    </div>
+    
+    <!-- Month navigation -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="?month={{ prev_month }}&year={{ prev_year }}" class="btn btn-outline-secondary">
+                    &laquo; Предыдущий месяц
+                </a>
+                
+                <h3 class="mb-0">{{ month_name }} {{ year }}</h3>
+                
+                <a href="?month={{ next_month }}&year={{ next_year }}" class="btn btn-outline-secondary">
+                    Следующий месяц &raquo;
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Work hours table -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="alert alert-info mb-4">
+                <p class="mb-0">
+                    <strong>Рабочих дней в месяце:</strong> {{ working_days }}
+                </p>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Сотрудник</th>
+                            <th>Ставка</th>
+                            <th>Отработано часов</th>
+                            <th>Требуется часов</th>
+                            <th>Разница</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in employee_hours %}
+                            <tr>
+                                <td>{{ item.employee.full_name }}</td>
+                                <td>{{ item.employee.rate }}</td>
+                                <td>{{ item.total_hours }}</td>
+                                <td>{{ item.required_hours }}</td>
+                                <td>
+                                    {% if item.difference > 0 %}
+                                        <span class="text-success">+{{ item.difference }}</span>
+                                    {% elif item.difference < 0 %}
+                                        <span class="text-danger">{{ item.difference }}</span>
+                                    {% else %}
+                                        <span class="text-muted">0</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center">Нет данных о сотрудниках</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

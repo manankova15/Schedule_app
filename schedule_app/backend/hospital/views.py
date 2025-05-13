@@ -64,7 +64,7 @@ def register(request):
         if form.is_valid():
             user = form.save()
             
-            full_name = form.cleaned_data.get('full_name') if role == 'staff' else user.email
+            full_name = form.cleaned_data.get('full_name')
             
             Employee.objects.create(
                 user=user,
@@ -85,7 +85,6 @@ def register(request):
     return render(request, 'registration/register.html', {'form': form})
 
 def register_manager(request):
-    # Redirect to the unified registration page
     return redirect('register')
 
 @login_required
@@ -299,7 +298,7 @@ def get_shift_info(shift_type):
     shift_types = {
         'morning': {'label': 'Утро', 'time': '8:00-14:00', 'color': 'success'},
         'evening': {'label': 'Вечер', 'time': '14:00-20:00', 'color': 'primary'},
-        'night': {'label': 'Ночь', 'time': '14:00-8:00', 'color': 'danger'}
+        'night': {'label': 'Ночь', 'time': '20:00-8:00', 'color': 'danger'}
     }
     
     return shift_types.get(shift_type, {'label': shift_type, 'time': '', 'color': 'secondary'})

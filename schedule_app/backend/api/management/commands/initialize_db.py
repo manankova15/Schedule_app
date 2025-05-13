@@ -119,12 +119,10 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.SUCCESS('Superuser already exists.'))
         
-        # Create test employees
         self.stdout.write(self.style.WARNING('Creating test employees...'))
         
         from api.models import CustomUser, Employee, Equipment, EmployeeEquipmentSkill
         
-        # Create equipment if it doesn't exist
         equipment_data = [
             {'name': 'МРТ аппарат 1', 'equipment_type': 'mrt'},
             {'name': 'РКТ GE аппарат', 'equipment_type': 'rkt_ge'},
@@ -139,7 +137,7 @@ class Command(BaseCommand):
                     'equipment_type': data['equipment_type'],
                     'shift_morning': True,
                     'shift_evening': True,
-                    'shift_night': data['equipment_type'] == 'mrt'  # Only MRT works at night
+                    'shift_night': data['equipment_type'] == 'mrt'
                 }
             )
             equipment_objects.append(equipment)
@@ -148,7 +146,6 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.SUCCESS(f'Equipment already exists: {equipment.name}'))
         
-        # Create test employees
         employee_data = [
             {'email': 'ivanov@hospital.ru', 'password': 'employee123', 'full_name': 'Иванов Иван Иванович', 'role': 'staff'},
             {'email': 'petrova@hospital.ru', 'password': 'employee123', 'full_name': 'Петрова Мария Сергеевна', 'role': 'staff'},
@@ -160,7 +157,7 @@ class Command(BaseCommand):
             {'email': 'novikova@hospital.ru', 'password': 'employee123', 'full_name': 'Новикова Татьяна Игоревна', 'role': 'staff'},
             {'email': 'volkov@hospital.ru', 'password': 'employee123', 'full_name': 'Волков Сергей Анатольевич', 'role': 'staff'},
             {'email': 'morozova@hospital.ru', 'password': 'employee123', 'full_name': 'Морозова Наталья Викторовна', 'role': 'staff'},
-            {'email': 'manager@hospital.ru', 'password': 'manager123', 'full_name': 'Главная Старшая', 'role': 'manager'}
+            {'email': 'manager@hospital.ru', 'password': 'manager123', 'full_name': 'Иванова Анна Петровна', 'role': 'manager'}
         ]
         
         created_employees = []
@@ -186,17 +183,14 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.SUCCESS(f'Employee already exists: {data["email"]}'))
         
-        # Assign equipment skills to employees
         for employee in created_employees:
             if employee.role == 'staff':
-                # Assign primary skill to first equipment
                 EmployeeEquipmentSkill.objects.get_or_create(
                     employee=employee,
                     equipment=equipment_objects[0],
                     defaults={'skill_level': 'primary'}
                 )
                 
-                # Assign secondary skill to second equipment for some employees
                 if employee.email in ['ivanov@hospital.ru', 'petrova@hospital.ru', 'sidorov@hospital.ru', 'kuznetsova@hospital.ru', 'smirnov@hospital.ru']:
                     EmployeeEquipmentSkill.objects.get_or_create(
                         employee=employee,
@@ -204,7 +198,6 @@ class Command(BaseCommand):
                         defaults={'skill_level': 'secondary'}
                     )
                 
-                # Assign secondary skill to third equipment for some other employees
                 if employee.email in ['popova@hospital.ru', 'sokolov@hospital.ru', 'novikova@hospital.ru', 'volkov@hospital.ru', 'morozova@hospital.ru']:
                     EmployeeEquipmentSkill.objects.get_or_create(
                         employee=employee,
@@ -212,10 +205,15 @@ class Command(BaseCommand):
                         defaults={'skill_level': 'secondary'}
                     )
         
+        for employee in Employee.objects.filter(role='manager'):
+            if employee.full_name == employee.email:
+                employee.full_name = "Иванова Анна Петровна"
+                employee.save()
+                self.stdout.write(self.style.SUCCESS(f'Updated manager full name: {employee.full_name}'))
+        
         self.stdout.write(self.style.SUCCESS('Test employees created successfully!'))
         self.stdout.write(self.style.SUCCESS('Database initialization completed successfully!'))
         
-        # Print login credentials for testing
         self.stdout.write(self.style.SUCCESS('\nTest login credentials:'))
         self.stdout.write(self.style.SUCCESS('Manager: manager@hospital.ru / manager123'))
         for data in employee_data:

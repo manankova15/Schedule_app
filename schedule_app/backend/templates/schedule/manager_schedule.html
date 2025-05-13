@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load custom_filters %}
 
 {% block title %}Управление расписанием | Расписание Областной Больницы{% endblock %}
 
@@ -13,6 +14,135 @@
             <a href="{% url 'time_off_requests' %}" class="btn btn-outline-primary">
                 Запросы на отгулы
             </a>
+        </div>
+    </div>
+    
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">Фильтры</h5>
+            <form id="filterForm" method="get" action="{% url 'manager_schedule' %}">
+                <input type="hidden" name="view" value="{{ view_mode }}">
+                <input type="hidden" name="date" value="{{ current_date|date:'Y-m-d' }}">
+                <input type="hidden" id="employees_input" name="employees" value="{{ request.GET.employees|default:'' }}">
+                <input type="hidden" id="equipment_input" name="equipment" value="{{ request.GET.equipment|default:'' }}">
+                <input type="hidden" id="shifts_input" name="shifts" value="{{ request.GET.shifts|default:'' }}">
+                
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Сотрудники</label>
+                        <div class="dropdown">
+                            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="employeeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                Выберите сотрудников
+                            </button>
+                            <div class="dropdown-menu p-3 w-100" aria-labelledby="employeeDropdown">
+                                <div class="mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="selectAllEmployees">
+                                        <label class="form-check-label" for="selectAllEmployees">
+                                            <strong>Выбрать все</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="dropdown-divider"></div>
+                                <div style="max-height: 200px; overflow-y: auto;">
+                                    {% for employee in employees %}
+                                    <div class="form-check">
+                                        <input class="form-check-input employee-checkbox" type="checkbox"
+                                               value="{{ employee.id }}" id="employee{{ employee.id }}"
+                                               {% if employee.id|stringformat:"i" in request.GET.employees|default:""|split:"," %}checked{% endif %}>
+                                        <label class="form-check-label" for="employee{{ employee.id }}">
+                                            {{ employee.full_name }}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Оборудование</label>
+                        <div class="dropdown">
+                            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="equipmentDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                Выберите оборудование
+                            </button>
+                            <div class="dropdown-menu p-3 w-100" aria-labelledby="equipmentDropdown">
+                                <div class="mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="selectAllEquipment">
+                                        <label class="form-check-label" for="selectAllEquipment">
+                                            <strong>Выбрать все</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="dropdown-divider"></div>
+                                <div style="max-height: 200px; overflow-y: auto;">
+                                    {% for equipment in equipment_list %}
+                                    <div class="form-check">
+                                        <input class="form-check-input equipment-checkbox" type="checkbox"
+                                               value="{{ equipment.id }}" id="equipment{{ equipment.id }}"
+                                               {% if equipment.id|stringformat:"i" in request.GET.equipment|default:""|split:"," %}checked{% endif %}>
+                                        <label class="form-check-label" for="equipment{{ equipment.id }}">
+                                            {{ equipment.name }}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Смены</label>
+                        <div class="dropdown">
+                            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="shiftDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                Выберите смены
+                            </button>
+                            <div class="dropdown-menu p-3 w-100" aria-labelledby="shiftDropdown">
+                                <div class="mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="selectAllShifts">
+                                        <label class="form-check-label" for="selectAllShifts">
+                                            <strong>Выбрать все</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="dropdown-divider"></div>
+                                <div class="form-check">
+                                    <input class="form-check-input shift-checkbox" type="checkbox"
+                                           value="morning" id="shiftMorning"
+                                           {% if 'morning' in request.GET.shifts|default:""|split:"," %}checked{% endif %}>
+                                    <label class="form-check-label" for="shiftMorning">
+                                        Утро (8:00-14:00)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input shift-checkbox" type="checkbox"
+                                           value="evening" id="shiftEvening"
+                                           {% if 'evening' in request.GET.shifts|default:""|split:"," %}checked{% endif %}>
+                                    <label class="form-check-label" for="shiftEvening">
+                                        Вечер (14:00-20:00)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input shift-checkbox" type="checkbox"
+                                           value="night" id="shiftNight"
+                                           {% if 'night' in request.GET.shifts|default:""|split:"," %}checked{% endif %}>
+                                    <label class="form-check-label" for="shiftNight">
+                                        Ночь (20:00-8:00)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-end">
+                    <a href="{% url 'manager_schedule' %}?view={{ view_mode }}&date={{ current_date|date:'Y-m-d' }}" class="btn btn-outline-secondary me-2">Сбросить</a>
+                    <button type="submit" class="btn btn-primary">Применить фильтры</button>
+                </div>
+            </form>
         </div>
     </div>
     
@@ -94,7 +224,7 @@
                                 <option value="">Выберите тип смены</option>
                                 <option value="morning">Утро (8:00-14:00)</option>
                                 <option value="evening">Вечер (14:00-20:00)</option>
-                                <option value="night">Ночь (14:00-8:00)</option>
+                                <option value="night">Ночь (20:00-8:00)</option>
                             </select>
                         </div>
                     </div>
@@ -112,7 +242,6 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Add button to add new schedule entry
         const calendarContainer = document.querySelector('.schedule-calendar');
         const addButton = document.createElement('button');
         addButton.className = 'btn btn-success position-fixed';
@@ -126,6 +255,122 @@
         addButton.setAttribute('data-bs-toggle', 'modal');
         addButton.setAttribute('data-bs-target', '#addScheduleModal');
         document.body.appendChild(addButton);
+        
+        function updateFilterInput(checkboxClass, inputId) {
+            const checkboxes = document.querySelectorAll('.' + checkboxClass + ':checked');
+            const values = Array.from(checkboxes).map(cb => cb.value);
+            document.getElementById(inputId).value = values.join(',');
+            
+            const dropdownId = inputId.replace('_input', 'Dropdown');
+            const dropdown = document.getElementById(dropdownId);
+            if (values.length === 0) {
+                dropdown.textContent = 'Выберите...';
+            } else if (values.length === 1) {
+                const label = document.querySelector('label[for="' + checkboxes[0].id + '"]').textContent.trim();
+                dropdown.textContent = label;
+            } else {
+                dropdown.textContent = 'Выбрано: ' + values.length;
+            }
+        }
+        
+        function initializeDropdownText() {
+            const employeeValues = document.getElementById('employees_input').value.split(',').filter(Boolean);
+            const employeeDropdown = document.getElementById('employeeDropdown');
+            if (employeeValues.length === 0) {
+                employeeDropdown.textContent = 'Выберите сотрудников';
+            } else if (employeeValues.length === 1) {
+                const checkbox = document.getElementById('employee' + employeeValues[0]);
+                if (checkbox) {
+                    const label = document.querySelector('label[for="employee' + employeeValues[0] + '"]').textContent.trim();
+                    employeeDropdown.textContent = label;
+                } else {
+                    employeeDropdown.textContent = 'Выбрано: 1';
+                }
+            } else {
+                employeeDropdown.textContent = 'Выбрано: ' + employeeValues.length;
+            }
+            
+            const equipmentValues = document.getElementById('equipment_input').value.split(',').filter(Boolean);
+            const equipmentDropdown = document.getElementById('equipmentDropdown');
+            if (equipmentValues.length === 0) {
+                equipmentDropdown.textContent = 'Выберите оборудование';
+            } else if (equipmentValues.length === 1) {
+                const checkbox = document.getElementById('equipment' + equipmentValues[0]);
+                if (checkbox) {
+                    const label = document.querySelector('label[for="equipment' + equipmentValues[0] + '"]').textContent.trim();
+                    equipmentDropdown.textContent = label;
+                } else {
+                    equipmentDropdown.textContent = 'Выбрано: 1';
+                }
+            } else {
+                equipmentDropdown.textContent = 'Выбрано: ' + equipmentValues.length;
+            }
+            
+            const shiftValues = document.getElementById('shifts_input').value.split(',').filter(Boolean);
+            const shiftDropdown = document.getElementById('shiftDropdown');
+            if (shiftValues.length === 0) {
+                shiftDropdown.textContent = 'Выберите смены';
+            } else if (shiftValues.length === 1) {
+                const shiftNames = {
+                    'morning': 'Утро (8:00-14:00)',
+                    'evening': 'Вечер (14:00-20:00)',
+                    'night': 'Ночь (20:00-8:00)'
+                };
+                shiftDropdown.textContent = shiftNames[shiftValues[0]] || 'Выбрано: 1';
+            } else {
+                shiftDropdown.textContent = 'Выбрано: ' + shiftValues.length;
+            }
+        }
+        
+        initializeDropdownText();
+        
+        document.querySelectorAll('.employee-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateFilterInput('employee-checkbox', 'employees_input');
+            });
+        });
+        
+        document.querySelectorAll('.equipment-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateFilterInput('equipment-checkbox', 'equipment_input');
+            });
+        });
+        
+        document.querySelectorAll('.shift-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateFilterInput('shift-checkbox', 'shifts_input');
+            });
+        });
+        
+        document.getElementById('selectAllEmployees').addEventListener('change', function() {
+            const isChecked = this.checked;
+            document.querySelectorAll('.employee-checkbox').forEach(cb => {
+                cb.checked = isChecked;
+            });
+            updateFilterInput('employee-checkbox', 'employees_input');
+        });
+        
+        document.getElementById('selectAllEquipment').addEventListener('change', function() {
+            const isChecked = this.checked;
+            document.querySelectorAll('.equipment-checkbox').forEach(cb => {
+                cb.checked = isChecked;
+            });
+            updateFilterInput('equipment-checkbox', 'equipment_input');
+        });
+        
+        document.getElementById('selectAllShifts').addEventListener('change', function() {
+            const isChecked = this.checked;
+            document.querySelectorAll('.shift-checkbox').forEach(cb => {
+                cb.checked = isChecked;
+            });
+            updateFilterInput('shift-checkbox', 'shifts_input');
+        });
+        
+        document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
+            dropdown.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        });
     });
 </script>
 {% endblock %}

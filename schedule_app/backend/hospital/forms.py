@@ -50,7 +50,6 @@ class EmployeeRegistrationForm(CustomUserCreationForm):
     class Meta(CustomUserCreationForm.Meta):
         fields = CustomUserCreationForm.Meta.fields + ('full_name', 'phone', 'registration_code')
 
-# Keep this for backward compatibility but it's no longer used
 class ManagerRegistrationForm(CustomUserCreationForm):
     manager_code = forms.CharField(
         label="Код Старшей",

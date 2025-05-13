@@ -93,7 +93,6 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Validate date range
         const form = document.querySelector('form');
         const startDateInput = document.getElementById('start_date');
         const endDateInput = document.getElementById('end_date');
@@ -118,7 +117,6 @@
             }
         });
         
-        // Redirect after successful generation
         {% if success %}
             setTimeout(function() {
                 window.location.href = "{% url 'home' %}";
