@@ -55,11 +55,32 @@
                                                                 </p>
                                                             </div>
                                                             <div class="modal-footer">
-                                                                <form method="post" action="{% url 'delete_schedule_entry' shift.id %}">
-                                                                    {% csrf_token %}
-                                                                    <button type="submit" class="btn btn-danger">Удалить</button>
-                                                                </form>
-                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                                <div class="d-flex justify-content-between w-100">
+                                                                    <div>
+                                                                        <a href="{% url 'edit_schedule_entry' shift.id %}" class="btn btn-primary">Редактировать</a>
+                                                                        <button type="button" class="btn btn-success" data-bs-toggle="collapse" data-bs-target="#moveForm{{ shift.id }}">Перенести</button>
+                                                                    </div>
+                                                                    <div>
+                                                                        <form method="post" action="{% url 'delete_schedule_entry' shift.id %}" class="d-inline">
+                                                                            {% csrf_token %}
+                                                                            <button type="submit" class="btn btn-danger">Удалить</button>
+                                                                        </form>
+                                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div class="collapse mt-3" id="moveForm{{ shift.id }}">
+                                                                    <div class="card card-body">
+                                                                        <form method="post" action="{% url 'move_schedule_entry' shift.id %}">
+                                                                            {% csrf_token %}
+                                                                            <div class="mb-3">
+                                                                                <label for="new_date{{ shift.id }}" class="form-label">Новая дата</label>
+                                                                                <input type="date" class="form-control" id="new_date{{ shift.id }}" name="new_date" required>
+                                                                            </div>
+                                                                            <button type="submit" class="btn btn-primary">Перенести смену</button>
+                                                                        </form>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -101,11 +122,32 @@
                                                                 </p>
                                                             </div>
                                                             <div class="modal-footer">
-                                                                <form method="post" action="{% url 'delete_schedule_entry' shift.id %}">
-                                                                    {% csrf_token %}
-                                                                    <button type="submit" class="btn btn-danger">Удалить</button>
-                                                                </form>
-                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                                <div class="d-flex justify-content-between w-100">
+                                                                    <div>
+                                                                        <a href="{% url 'edit_schedule_entry' shift.id %}" class="btn btn-primary">Редактировать</a>
+                                                                        <button type="button" class="btn btn-success" data-bs-toggle="collapse" data-bs-target="#moveForm{{ shift.id }}">Перенести</button>
+                                                                    </div>
+                                                                    <div>
+                                                                        <form method="post" action="{% url 'delete_schedule_entry' shift.id %}" class="d-inline">
+                                                                            {% csrf_token %}
+                                                                            <button type="submit" class="btn btn-danger">Удалить</button>
+                                                                        </form>
+                                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div class="collapse mt-3" id="moveForm{{ shift.id }}">
+                                                                    <div class="card card-body">
+                                                                        <form method="post" action="{% url 'move_schedule_entry' shift.id %}">
+                                                                            {% csrf_token %}
+                                                                            <div class="mb-3">
+                                                                                <label for="new_date{{ shift.id }}" class="form-label">Новая дата</label>
+                                                                                <input type="date" class="form-control" id="new_date{{ shift.id }}" name="new_date" required>
+                                                                            </div>
+                                                                            <button type="submit" class="btn btn-primary">Перенести смену</button>
+                                                                        </form>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -147,11 +189,32 @@
                                                                 </p>
                                                             </div>
                                                             <div class="modal-footer">
-                                                                <form method="post" action="{% url 'delete_schedule_entry' shift.id %}">
-                                                                    {% csrf_token %}
-                                                                    <button type="submit" class="btn btn-danger">Удалить</button>
-                                                                </form>
-                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                                <div class="d-flex justify-content-between w-100">
+                                                                    <div>
+                                                                        <a href="{% url 'edit_schedule_entry' shift.id %}" class="btn btn-primary">Редактировать</a>
+                                                                        <button type="button" class="btn btn-success" data-bs-toggle="collapse" data-bs-target="#moveForm{{ shift.id }}">Перенести</button>
+                                                                    </div>
+                                                                    <div>
+                                                                        <form method="post" action="{% url 'delete_schedule_entry' shift.id %}" class="d-inline">
+                                                                            {% csrf_token %}
+                                                                            <button type="submit" class="btn btn-danger">Удалить</button>
+                                                                        </form>
+                                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div class="collapse mt-3" id="moveForm{{ shift.id }}">
+                                                                    <div class="card card-body">
+                                                                        <form method="post" action="{% url 'move_schedule_entry' shift.id %}">
+                                                                            {% csrf_token %}
+                                                                            <div class="mb-3">
+                                                                                <label for="new_date{{ shift.id }}" class="form-label">Новая дата</label>
+                                                                                <input type="date" class="form-control" id="new_date{{ shift.id }}" name="new_date" required>
+                                                                            </div>
+                                                                            <button type="submit" class="btn btn-primary">Перенести смену</button>
+                                                                        </form>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>

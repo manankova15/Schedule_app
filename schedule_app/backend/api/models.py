@@ -150,3 +150,30 @@ class TimeOffRequest(models.Model):
 
     def __str__(self):
         return f"{self.employee.full_name} - {self.start_date} to {self.end_date} - {self.get_status_display()}"
+
+class ScheduleVersion(models.Model):
+    """Model to store versions of schedules for later restoration"""
+    name = models.CharField(max_length=255, verbose_name="Название версии")
+    created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='schedule_versions')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
+    start_date = models.DateField(verbose_name="Дата начала периода")
+    end_date = models.DateField(verbose_name="Дата окончания периода")
+    
+    def __str__(self):
+        return f"{self.name} ({self.start_date} - {self.end_date})"
+    
+    class Meta:
+        verbose_name = "Версия расписания"
+        verbose_name_plural = "Версии расписания"
+        ordering = ['-created_at']
+
+class ScheduleVersionEntry(models.Model):
+    """Individual entries for a schedule version"""
+    version = models.ForeignKey(ScheduleVersion, on_delete=models.CASCADE, related_name='entries')
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE)
+    shift_type = models.CharField(max_length=50, choices=Schedule.SHIFT_TYPES, verbose_name="Тип смены")
+    date = models.DateField(verbose_name="Дата")
+    
+    def __str__(self):
+        return f"{self.employee.full_name} - {self.equipment.name} - {self.get_shift_type_display()} - {self.date}"

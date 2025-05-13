@@ -16,7 +16,7 @@ from api.views import (
 )
 
 from hospital import views
-from hospital.views_part2 import employee_work_hours
+from hospital.views_part2 import employee_work_hours, edit_schedule_entry, restore_schedule_version, move_schedule_entry
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
@@ -52,7 +52,10 @@ urlpatterns = [
     
     path('schedule-generator/', views.schedule_generator, name='schedule_generator'),
     path('schedule/create/', views.create_schedule_entry, name='create_schedule_entry'),
+    path('schedule/edit/<int:entry_id>/', edit_schedule_entry, name='edit_schedule_entry'),
     path('schedule/delete/<int:entry_id>/', views.delete_schedule_entry, name='delete_schedule_entry'),
+    path('schedule/move/<int:entry_id>/', move_schedule_entry, name='move_schedule_entry'),
+    path('schedule/restore-version/<int:version_id>/', restore_schedule_version, name='restore_schedule_version'),
     
     path('time-off-requests/', views.time_off_requests, name='time_off_requests'),
     path('time-off-requests/new/', views.time_off_request_new, name='time_off_request_new'),

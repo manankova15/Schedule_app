@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}Редактирование смены{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Редактирование смены</h1>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Информация о смене</h5>
+        </div>
+        <div class="card-body">
+            <p><strong>Дата:</strong> {{ entry.date }}</p>
+            <p><strong>Текущий сотрудник:</strong> {{ entry.employee.full_name }}</p>
+            <p><strong>Текущее оборудование:</strong> {{ entry.equipment.name }}</p>
+            <p><strong>Текущий тип смены:</strong> {{ entry.get_shift_type_display }}</p>
+        </div>
+    </div>
+    
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <form method="post" action="{% url 'edit_schedule_entry' entry.id %}">
+        {% csrf_token %}
+        
+        <div class="form-group mb-3">
+            <label for="employee">Сотрудник:</label>
+            <select class="form-control" id="employee" name="employee" required>
+                <option value="">Выберите сотрудника</option>
+                {% for employee in employees %}
+                <option value="{{ employee.id }}" {% if employee.id == entry.employee.id %}selected{% endif %} 
+                        data-primary-equipment="{{ employee_primary_equipment|get_item:employee.id|join:',' }}">
+                    {{ employee.full_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group mb-3">
+            <label for="equipment">Оборудование:</label>
+            <select class="form-control" id="equipment" name="equipment" required>
+                <option value="">Выберите оборудование</option>
+                {% for equipment in equipment_list %}
+                <option value="{{ equipment.id }}" {% if equipment.id == entry.equipment.id %}selected{% endif %}>
+                    {{ equipment.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group mb-3">
+            <label for="shift_type">Тип смены:</label>
+            <select class="form-control" id="shift_type" name="shift_type" required>
+                <option value="">Выберите тип смены</option>
+                <option value="morning" {% if entry.shift_type == 'morning' %}selected{% endif %}>Утро (8:00-14:00)</option>
+                <option value="evening" {% if entry.shift_type == 'evening' %}selected{% endif %}>Вечер (14:00-20:00)</option>
+                <option value="night" {% if entry.shift_type == 'night' %}selected{% endif %}>Ночь (20:00-8:00)</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+            <a href="{% url 'manager_schedule' %}" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const employeeSelect = document.getElementById('employee');
+        const equipmentSelect = document.getElementById('equipment');
+        const form = document.querySelector('form');
+        
+        function filterEquipment() {
+            const selectedEmployee = employeeSelect.options[employeeSelect.selectedIndex];
+            if (!selectedEmployee || !selectedEmployee.value) return;
+            
+            const primaryEquipment = selectedEmployee.dataset.primaryEquipment.split(',').map(id => parseInt(id));
+            
+            Array.from(equipmentSelect.options).forEach(option => {
+                if (option.value === '') return;
+                option.style.display = '';
+            });
+            
+            if (equipmentSelect.value === '' || !primaryEquipment.includes(parseInt(equipmentSelect.value))) {
+                if (primaryEquipment.length > 0) {
+                    equipmentSelect.value = primaryEquipment[0];
+                }
+            }
+        }
+        
+        filterEquipment();
+        
+        employeeSelect.addEventListener('change', filterEquipment);
+        
+        form.addEventListener('submit', function(e) {
+            if (employeeSelect.value === '') {
+                e.preventDefault();
+                alert('Пожалуйста, выберите сотрудника');
+                return false;
+            }
+            
+            if (equipmentSelect.value === '') {
+                e.preventDefault();
+                alert('Пожалуйста, выберите оборудование');
+                return false;
+            }
+            
+            return true;
+        });
+    });
+</script>
+{% endblock %}

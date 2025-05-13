@@ -12,6 +12,16 @@
                     <p class="text-muted small mb-0">Для сотрудников и старшей</p>
                 </div>
                 <div class="card-body">
+                    {% if messages %}
+                    <div class="messages">
+                        {% for message in messages %}
+                        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
                     {% if form.errors %}
                     <div class="alert alert-danger">
                         <p>Пожалуйста, исправьте следующие ошибки:</p>
@@ -123,7 +133,6 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Toggle password visibility
         const togglePassword1 = document.getElementById('togglePassword1');
         const togglePassword2 = document.getElementById('togglePassword2');
         const password1 = document.getElementById('id_password1');

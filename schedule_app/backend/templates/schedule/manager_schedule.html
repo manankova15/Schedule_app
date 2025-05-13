@@ -11,9 +11,27 @@
             <a href="{% url 'schedule_generator' %}" class="btn btn-primary me-2">
                 Генерировать расписание
             </a>
-            <a href="{% url 'time_off_requests' %}" class="btn btn-outline-primary">
+            <a href="{% url 'time_off_requests' %}" class="btn btn-outline-primary me-2">
                 Запросы на отгулы
             </a>
+            
+            <!-- Schedule Versions Dropdown -->
+            {% if schedule_versions %}
+            <div class="dropdown d-inline-block">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="versionDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    Версии расписания
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="versionDropdown">
+                    {% for version in schedule_versions %}
+                    <li>
+                        <a class="dropdown-item" href="{% url 'restore_schedule_version' version.id %}">
+                            {{ version.name }} ({{ version.start_date|date:"d.m.Y" }} - {{ version.end_date|date:"d.m.Y" }})
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </div>
     
