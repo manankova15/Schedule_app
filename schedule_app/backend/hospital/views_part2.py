@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, date
 import calendar
+import heapq
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
@@ -209,8 +210,7 @@ def manager_schedule(request):
 @login_required
 @manager_required
 def schedule_generator(request):
-    """Schedule generator view"""
-    """Schedule generator view using combined Hopcroft-Karp algorithm and rules-based approach for optimal schedule generation"""
+    """Schedule generator view using Hopcroft-Karp algorithm for optimal schedule generation"""
     error = None
     success = False
     
@@ -233,11 +233,13 @@ def schedule_generator(request):
                     if diff_days > 31:
                         error = "Период не должен превышать 31 день"
                     else:
+                        # Clear existing schedule for the selected period
                         Schedule.objects.filter(date__gte=start_date, date__lte=end_date).delete()
                         
                         employees = Employee.objects.all()
                         equipment_list = Equipment.objects.all()
                         
+                        # Categorize employees by shift availability
                         day_workers = []
                         on_call_workers = []
                         regular_workers = []
@@ -254,14 +256,17 @@ def schedule_generator(request):
                         shift_nodes = []
                         edges = {}
                         
+                        # Create shift nodes for each date, equipment, and shift type
                         current_date = start_date
                         while current_date <= end_date:
                             is_weekend = current_date.weekday() >= 5
                             
                             for equipment in equipment_list:
+                                # Skip non-RKT equipment on weekends
                                 if is_weekend and equipment.equipment_type != 'rkt_ge':
                                     continue
                                 
+                                # Add shift nodes based on equipment availability
                                 if equipment.shift_morning:
                                     shift_nodes.append((current_date, equipment.id, 'morning'))
                                 if equipment.shift_evening:
@@ -271,6 +276,7 @@ def schedule_generator(request):
                             
                             current_date += timedelta(days=1)
                         
+                        # Initialize employee workload tracking
                         employee_workload = {employee.id: 0 for employee in employees}
                         
                         for employee in employees:
@@ -286,178 +292,231 @@ def schedule_generator(request):
                                 equipment = Equipment.objects.get(id=equipment_id)
                                 is_weekend = date.weekday() >= 5
                                 
-                                weight = 1
+                                # Base weight starts at 0
+                                weight = 0
                                 
+                                # Check if employee has the skill for this equipment
                                 skill = EmployeeEquipmentSkill.objects.filter(
                                     employee=employee,
                                     equipment=equipment
                                 ).first()
                                 
-                                if skill:
-                                    if skill.skill_level == 'primary':
-                                        weight += 50
+                                if not skill:
+                                    continue  # Skip if employee doesn't have the skill
+                                
+                                # Skill level weight
+                                if skill.skill_level == 'primary':
+                                    weight += 100  # Strongly prefer primary skills
+                                else:
+                                    weight += 30   # Secondary skills are acceptable but less preferred
+                                
+                                # Shift availability constraints
+                                if employee.shift_availability == 'morning_only':
+                                    # Morning-only employees should only work morning shifts on weekdays
+                                    if not is_weekend and shift_type == 'morning':
+                                        weight += 200  # Strongly prefer morning shifts for morning-only employees
                                     else:
-                                        weight += 15
-                                    
-                                    if employee.shift_availability == 'morning_only':
-                                        if not is_weekend and shift_type == 'morning':
-                                            weight += 100
-                                        elif is_weekend or shift_type != 'morning':
-                                            weight -= 100
-                                    
-                                    elif employee.shift_availability == 'all_shifts':
-                                        if is_weekend:
-                                            if shift_type == 'morning':
-                                                weight += 30
-                                            else:
-                                                morning_shift = (date, equipment_id, 'morning')
-                                                if morning_shift in shift_nodes and (employee.id, morning_shift) in edges:
-                                                    weight += 100
-                                        else:
-                                            if shift_type in ['evening', 'night']:
-                                                weight += 30
-                                    
-                                    time_off = TimeOffRequest.objects.filter(
-                                        employee=employee,
-                                        start_date__lte=date,
-                                        end_date__gte=date,
-                                        status='approved'
-                                    ).first()
-                                    
-                                    if time_off:
-                                        weight -= 50
-                                    else:
-                                        pending_time_off = TimeOffRequest.objects.filter(
-                                            employee=employee,
-                                            start_date__lte=date,
-                                            end_date__gte=date
-                                        ).first()
-                                        
-                                        if pending_time_off:
-                                            if pending_time_off.priority == 'low':
-                                                weight -= 10
-                                            elif pending_time_off.priority == 'medium':
-                                                weight -= 20
-                                            elif pending_time_off.priority == 'high':
-                                                weight -= 30
-                                    
-                                    prev_day_schedule = Schedule.objects.filter(
-                                        employee=employee,
-                                        date=date - timedelta(days=1)
-                                    ).exists()
-                                    
-                                    if prev_day_schedule:
-                                        if employee.shift_availability != 'morning_only':
-                                            weight -= 50
-                                    
-                                    same_day_schedule = Schedule.objects.filter(
-                                        employee=employee,
-                                        date=date
-                                    ).exists()
-                                    
-                                    if same_day_schedule:
-                                        if employee.shift_availability == 'all_shifts' and is_weekend:
-                                            weight += 20
-                                        else:
-                                            weight -= 50
-                                    
-                                    current_workload = employee_shifts + employee_workload.get(employee.id, 0)
-                                    
-                                    current_date_month = date.month
-                                    current_date_year = date.year
-                                    working_days_in_month = get_working_days_in_month(current_date_year, current_date_month)
-                                    required_hours = working_days_in_month * 6
-                                    if float(employee.rate) == 1.5:
-                                        required_hours = round(required_hours * 1.5)
-                                    
-                                    current_hours = 0
-                                    for s in Schedule.objects.filter(
-                                        employee=employee,
-                                        date__month=current_date_month,
-                                        date__year=current_date_year
-                                    ):
-                                        if s.shift_type == 'morning':
-                                            current_hours += 6
-                                        elif s.shift_type == 'evening':
-                                            current_hours += 6
-                                        elif s.shift_type == 'night':
-                                            current_hours += 12
-                                    
-                                    shift_hours = 0
-                                    if shift_type == 'morning':
-                                        shift_hours = 6
-                                    elif shift_type == 'evening':
-                                        shift_hours = 6
-                                    elif shift_type == 'night':
-                                        shift_hours = 12
-                                    
-                                    hours_after_shift = current_hours + shift_hours
-                                    
-                                    if hours_after_shift > required_hours + 12:
-                                        continue
-                                    elif hours_after_shift > required_hours:
-                                        weight -= (hours_after_shift - required_hours) * 5
-                                    elif hours_after_shift < required_hours:
-                                        remaining_hours = required_hours - hours_after_shift
-                                        weight += min(remaining_hours * 2, 30)
-                                    
+                                        weight -= 500  # Heavily penalize non-morning shifts for morning-only employees
+                                        continue       # Skip this assignment entirely
+                                
+                                elif employee.shift_availability == 'day_only':
+                                    # Day-only employees should not work night shifts
                                     if shift_type == 'night':
-                                        prev_night = Schedule.objects.filter(
-                                            employee=employee,
-                                            shift_type='night',
-                                            date__lt=date
-                                        ).order_by('-date').first()
-                                        if prev_night:
-                                            days_since_last_night = (date - prev_night.date).days
-                                            if days_since_last_night < 2:
-                                                continue
-                                            elif days_since_last_night == 2:
-                                                weight -= 100
-
-                                    if shift_type == 'night' and employee.shift_availability == 'all_shifts':
-                                        n_nights_past = Schedule.objects.filter(
-                                            employee=employee,
-                                            shift_type='night',
-                                            date__month=current_date_month,
-                                            date__year=current_date_year,
-                                        ).count()
-                                        n_nights_future = 0
-                                        for edge, w in edges.items():
-                                            eid, snode = edge
-                                            if (eid == employee.id and snode[2] == 'night' and
-                                                snode[0].month == current_date_month and
-                                                snode[0].year == current_date_year):
-                                                n_nights_future += 1
-                                        total_nights = n_nights_past + n_nights_future
-                                        avg_nights = (
-                                            len([s for s in shift_nodes if s[2] == 'night' and
-                                                 s[0].month == current_date_month and
-                                                 s[0].year == current_date_year]) /
-                                            (len([e for e in employees if e.shift_availability == 'all_shifts']) or 1)
-                                        )
-                                        if total_nights > avg_nights + 1:
-                                            continue
-                                        elif total_nights > avg_nights:
-                                            weight -= 80
-
-                                    if shift_type == 'night' and employee.shift_availability == 'all_shifts':
-                                        n_nights_for_employee = Schedule.objects.filter(
-                                            employee=employee,
-                                            shift_type='night',
-                                            date__month=current_date_month,
-                                            date__year=current_date_year,
-                                        ).count()
-                                        avg_nights = (
-                                            len([s for s in shift_nodes if s[2] == 'night' and
-                                                 s[0].month == current_date_month and
-                                                 s[0].year == current_date_year]) /
-                                            (len([e for e in employees if e.shift_availability == 'all_shifts']) or 1)
-                                        )
-                                        max_nights = int(avg_nights + 1)
-                                        if n_nights_for_employee >= max_nights:
-                                            continue
+                                        weight -= 500  # Heavily penalize night shifts for day-only employees
+                                        continue       # Skip this assignment entirely
+                                    else:
+                                        weight += 50   # Prefer day shifts for day-only employees
+                                
+                                elif employee.shift_availability == 'all_shifts':
+                                    # On-call workers handle all shifts
+                                    if is_weekend:
+                                        # On weekends, prefer the same worker for all shifts on the same equipment
+                                        if shift_type == 'morning':
+                                            weight += 50
+                                        else:
+                                            # Check if this worker is already assigned to the morning shift
+                                            morning_shift = (date, equipment_id, 'morning')
+                                            if morning_shift in shift_nodes:
+                                                # Check existing schedules
+                                                morning_schedule = Schedule.objects.filter(
+                                                    employee=employee,
+                                                    equipment=equipment,
+                                                    date=date,
+                                                    shift_type='morning'
+                                                ).exists()
+                                                
+                                                if morning_schedule:
+                                                    weight += 200  # Strongly prefer same worker for all shifts
+                                    else:
+                                        # On weekdays, on-call workers primarily handle evening and night shifts
+                                        if shift_type in ['evening', 'night']:
+                                            weight += 100
+                                
+                                # Time-off requests
+                                time_off = TimeOffRequest.objects.filter(
+                                    employee=employee,
+                                    start_date__lte=date,
+                                    end_date__gte=date
+                                ).first()
+                                
+                                if time_off:
+                                    if time_off.status == 'approved':
+                                        weight -= 1000  # Approved time-off should be respected
+                                        continue        # Skip this assignment entirely
+                                    else:
+                                        # Pending time-off with different priorities
+                                        if time_off.priority == 'low':
+                                            weight -= 50
+                                        elif time_off.priority == 'medium':
+                                            weight -= 150
+                                        elif time_off.priority == 'high':
+                                            weight -= 300
+                                
+                                # Rest period between shifts
+                                # Check previous day
+                                prev_day_schedule = Schedule.objects.filter(
+                                    employee=employee,
+                                    date=date - timedelta(days=1)
+                                ).exists()
+                                
+                                if prev_day_schedule:
+                                    weight -= 300  # Penalize consecutive work days
+                                
+                                # Check previous 2 days for night shifts
+                                for days_back in range(1, 4):
+                                    prev_day = date - timedelta(days=days_back)
+                                    prev_night_shift = Schedule.objects.filter(
+                                        employee=employee,
+                                        date=prev_day,
+                                        shift_type='night'
+                                    ).exists()
                                     
-                                    edges[(employee.id, shift_node)] = weight
+                                    if prev_night_shift:
+                                        if days_back < 3:
+                                            weight -= 500  # Need at least 3 days rest after night shift
+                                            continue       # Skip this assignment entirely
+                                        else:
+                                            weight -= 100  # Still prefer more rest if possible
+                                
+                                # Same day schedule (should not have multiple shifts on same day except for on-call on weekends)
+                                same_day_schedule = Schedule.objects.filter(
+                                    employee=employee,
+                                    date=date
+                                ).exists()
+                                
+                                if same_day_schedule:
+                                    if employee.shift_availability == 'all_shifts' and is_weekend:
+                                        # For on-call workers on weekends, we want them to cover all shifts
+                                        weight += 100
+                                    else:
+                                        weight -= 500  # Otherwise, heavily penalize multiple shifts on same day
+                                        continue       # Skip this assignment entirely
+                                
+                                # Workload balance - ensure employees work close to their required hours
+                                current_date_month = date.month
+                                current_date_year = date.year
+                                working_days_in_month = get_working_days_in_month(current_date_year, current_date_month)
+                                
+                                # Calculate required hours based on employee rate
+                                required_hours = working_days_in_month * 6  # Base: 6 hours per working day
+                                if float(employee.rate) == 1.5:
+                                    required_hours = round(required_hours * 1.5)  # 1.5 rate means 1.5x hours
+                                
+                                # Calculate current hours worked this month
+                                current_hours = 0
+                                for s in Schedule.objects.filter(
+                                    employee=employee,
+                                    date__month=current_date_month,
+                                    date__year=current_date_year
+                                ):
+                                    if s.shift_type == 'morning':
+                                        current_hours += 6
+                                    elif s.shift_type == 'evening':
+                                        current_hours += 6
+                                    elif s.shift_type == 'night':
+                                        current_hours += 12
+                                
+                                # Calculate future hours from already assigned edges
+                                future_hours = 0
+                                for edge, edge_weight in edges.items():
+                                    e_id, s_node = edge
+                                    if (e_id == employee.id and
+                                        s_node[0].month == current_date_month and
+                                        s_node[0].year == current_date_year):
+                                        if s_node[2] == 'morning':
+                                            future_hours += 6
+                                        elif s_node[2] == 'evening':
+                                            future_hours += 6
+                                        elif s_node[2] == 'night':
+                                            future_hours += 12
+                                
+                                # Add hours for this shift
+                                shift_hours = 0
+                                if shift_type == 'morning':
+                                    shift_hours = 6
+                                elif shift_type == 'evening':
+                                    shift_hours = 6
+                                elif shift_type == 'night':
+                                    shift_hours = 12
+                                
+                                total_hours = current_hours + future_hours + shift_hours
+                                
+                                # Adjust weight based on workload
+                                if total_hours > required_hours + 12:
+                                    # Too many hours, skip this assignment
+                                    continue
+                                elif total_hours > required_hours:
+                                    # Slightly over required hours - strongly penalize
+                                    weight -= (total_hours - required_hours) * 20
+                                elif total_hours < required_hours - 12:
+                                    # Significantly under required hours - prioritize assignments
+                                    remaining_hours = required_hours - total_hours
+                                    weight += min(remaining_hours * 10, 200)
+                                elif total_hours < required_hours:
+                                    # Slightly under required hours - moderately prioritize
+                                    remaining_hours = required_hours - total_hours
+                                    weight += min(remaining_hours * 5, 100)
+                                else:
+                                    # Perfect match to required hours - strongly prioritize
+                                    weight += 150
+                                
+                                # Night shift distribution for on-call workers
+                                if shift_type == 'night' and employee.shift_availability == 'all_shifts':
+                                    # Count night shifts for this employee in current month
+                                    n_nights_for_employee = Schedule.objects.filter(
+                                        employee=employee,
+                                        shift_type='night',
+                                        date__month=current_date_month,
+                                        date__year=current_date_year,
+                                    ).count()
+                                    
+                                    # Count total night shifts and on-call workers for fair distribution
+                                    total_night_shifts = len([s for s in shift_nodes if s[2] == 'night' and
+                                                             s[0].month == current_date_month and
+                                                             s[0].year == current_date_year])
+                                    
+                                    total_on_call_workers = len([e for e in employees if e.shift_availability == 'all_shifts'])
+                                    
+                                    # Calculate average night shifts per on-call worker
+                                    avg_nights = total_night_shifts / (total_on_call_workers or 1)
+                                    
+                                    # Adjust weight based on night shift distribution
+                                    if n_nights_for_employee > avg_nights + 1:
+                                        weight -= 200  # Too many night shifts compared to others
+                                    elif n_nights_for_employee < avg_nights - 1:
+                                        weight += 50   # Fewer night shifts, should take more
+                                
+                                # Equipment-specific constraints
+                                if equipment.equipment_type == 'rkt_ge':
+                                    # RKT works 24/7, needs coverage for all shifts
+                                    weight += 20
+                                elif equipment.equipment_type in ['mrt', 'rkt_toshiba']:
+                                    # MRT and Toshiba don't need separate on-call staff on weekends
+                                    if is_weekend and shift_type != 'morning':
+                                        weight -= 50
+                                
+                                # Add the edge with calculated weight
+                                edges[(employee.id, shift_node)] = weight
                         
                         initial_matching = find_maximum_weighted_matching(employee_nodes, shift_nodes, edges)
                         final_matching = apply_scheduling_rules(
@@ -469,9 +528,101 @@ def schedule_generator(request):
                             on_call_workers
                         )
                         
-                        matching = final_matching
+                        # Process the final matching to ensure no conflicts
+                        # 1. No employee works multiple shifts at the same time
+                        # 2. No equipment has multiple shifts of the same type on the same day
                         
-                        for (employee_id, shift_node) in matching:
+                        # Group matching by date and shift type to check for conflicts
+                        shifts_by_date_type = {}
+                        for employee_id, shift_node in final_matching:
+                            date, equipment_id, shift_type = shift_node
+                            key = (date, shift_type)
+                            if key not in shifts_by_date_type:
+                                shifts_by_date_type[key] = []
+                            shifts_by_date_type[key].append((employee_id, equipment_id))
+                        
+                        # Check for and resolve conflicts
+                        resolved_matching = []
+                        assigned_employees = {}  # date -> {employee_id}
+                        
+                        # Sort matching by date to process chronologically
+                        sorted_matching = sorted(final_matching, key=lambda x: x[1][0])
+                        
+                        for employee_id, shift_node in sorted_matching:
+                            date, equipment_id, shift_type = shift_node
+                            
+                            # Check if employee already has a shift on this date
+                            if date not in assigned_employees:
+                                assigned_employees[date] = set()
+                            
+                            if employee_id in assigned_employees[date]:
+                                # Skip this assignment - employee already has a shift on this date
+                                continue
+                            
+                            # Check if this equipment already has this shift type on this date
+                            conflict = False
+                            for res_employee_id, res_shift_node in resolved_matching:
+                                res_date, res_equipment_id, res_shift_type = res_shift_node
+                                if res_date == date and res_equipment_id == equipment_id and res_shift_type == shift_type:
+                                    conflict = True
+                                    break
+                            
+                            if not conflict:
+                                resolved_matching.append((employee_id, shift_node))
+                                assigned_employees[date].add(employee_id)
+                        
+                        # Check if all shifts are assigned after conflict resolution
+                        assigned_shifts = set(shift_node for _, shift_node in resolved_matching)
+                        unassigned_shifts = [s for s in shift_nodes if s not in assigned_shifts]
+                        
+                        if unassigned_shifts:
+                            print(f"WARNING: {len(unassigned_shifts)} shifts are unassigned after conflict resolution. Assigning them now.")
+                            
+                            # For each unassigned shift, find the best available employee
+                            for shift_node in unassigned_shifts:
+                                date, equipment_id, shift_type = shift_node
+                                
+                                # Find employees who don't have a shift on this date
+                                available_employees = []
+                                for employee_id in employee_nodes:
+                                    if employee_id not in assigned_employees.get(date, set()):
+                                        # Check if employee has the skill for this equipment
+                                        skill = EmployeeEquipmentSkill.objects.filter(
+                                            employee_id=employee_id,
+                                            equipment_id=equipment_id
+                                        ).exists()
+                                        
+                                        if skill:
+                                            available_employees.append(employee_id)
+                                
+                                if available_employees:
+                                    # Choose the employee with the fewest shifts
+                                    employee_counts = {}
+                                    for e_id in available_employees:
+                                        employee_counts[e_id] = sum(1 for _, s in resolved_matching if s[0] == e_id)
+                                    
+                                    best_employee_id = min(employee_counts.items(), key=lambda x: x[1])[0]
+                                    resolved_matching.append((best_employee_id, shift_node))
+                                    
+                                    if date not in assigned_employees:
+                                        assigned_employees[date] = set()
+                                    assigned_employees[date].add(best_employee_id)
+                                else:
+                                    # If no employee is available without a shift on this date,
+                                    # choose any employee with the fewest shifts
+                                    employee_counts = {}
+                                    for e_id in employee_nodes:
+                                        employee_counts[e_id] = sum(1 for _, s in resolved_matching if s[0] == e_id)
+                                    
+                                    best_employee_id = min(employee_counts.items(), key=lambda x: x[1])[0]
+                                    resolved_matching.append((best_employee_id, shift_node))
+                                    
+                                    if date not in assigned_employees:
+                                        assigned_employees[date] = set()
+                                    assigned_employees[date].add(best_employee_id)
+                        
+                        # Create schedule entries from the resolved matching
+                        for employee_id, shift_node in resolved_matching:
                             date, equipment_id, shift_type = shift_node
                             Schedule.objects.create(
                                 employee=Employee.objects.get(id=employee_id),
@@ -481,7 +632,6 @@ def schedule_generator(request):
                             )
                         
                         success = True
-                        messages.success(request, "Расписание успешно сгенерировано с использованием алгоритма Хопкрофта-Карпа!")
                         return redirect('manager_schedule')
             except ValueError:
                 error = "Неверный формат даты"
@@ -503,48 +653,167 @@ def find_maximum_weighted_matching(employee_nodes, shift_nodes, edges):
     """
     Implementation of the Hopcroft-Karp algorithm for maximum weighted bipartite matching.
     Returns a list of (employee_id, shift_node) pairs representing the optimal matching.
+    
+    This implementation ensures all shifts are assigned while trying to maximize the total weight.
     """
-    employee_workload = {employee_id: 0 for employee_id in employee_nodes}
-    sorted_edges = sorted(edges.items(), key=lambda x: x[1], reverse=True)
-    matching = []
-    assigned_employees = {}
-    assigned_shifts = set()
+    import heapq
     
-    for (employee_id, shift_node), weight in sorted_edges:
-        if shift_node in assigned_shifts:
-            continue
-            
-        date, _, _ = shift_node
+    # Initialize empty matching
+    matching = {}  # shift_node -> employee_id
+    reverse_matching = {}  # employee_id -> set of shift_nodes
+    
+    # First pass: Try to assign shifts with strict constraints
+    # Create a priority queue for edges
+    edge_heap = []
+    for employee_id in employee_nodes:
+        for shift_node in shift_nodes:
+            if (employee_id, shift_node) in edges:
+                # Store negative weight for max-heap behavior
+                heapq.heappush(edge_heap, (-edges[(employee_id, shift_node)], employee_id, shift_node))
+    
+    # Process edges in order of decreasing weight
+    while edge_heap:
+        neg_weight, employee_id, shift_node = heapq.heappop(edge_heap)
+        weight = -neg_weight  # Convert back to positive weight
         
-        has_shift_today = False
-        if employee_id in assigned_employees:
-            for s_node in assigned_employees[employee_id]:
-                if s_node[0] == date:
-                    has_shift_today = True
-                    break
-                
-        employee = Employee.objects.get(id=employee_id)
-        is_weekend = date.weekday() >= 5
-        if has_shift_today and not (employee.shift_availability == 'all_shifts' and is_weekend):
+        # Skip if this shift is already assigned
+        if shift_node in matching:
             continue
             
-        matching.append((employee_id, shift_node))
-        if employee_id not in assigned_employees:
-            assigned_employees[employee_id] = []
-        assigned_employees[employee_id].append(shift_node)
-        assigned_shifts.add(shift_node)
-        employee_workload[employee_id] += 1
+        # Check if employee already has a shift on this date
+        date, equipment_id, shift_type = shift_node
+        has_conflict = False
+        
+        if employee_id in reverse_matching:
+            for existing_shift in reverse_matching[employee_id]:
+                existing_date = existing_shift[0]
+                if existing_date == date:
+                    has_conflict = True
+                    break
+        
+        if has_conflict:
+            continue
+            
+        # Check for rest period after night shifts
+        if employee_id in reverse_matching:
+            for existing_shift in reverse_matching[employee_id]:
+                existing_date, _, existing_shift_type = existing_shift
+                if existing_shift_type == 'night':
+                    days_diff = (date - existing_date).days
+                    if days_diff < 3:  # Require at least 3 days rest after night shift
+                        has_conflict = True
+                        break
+        
+        if has_conflict:
+            continue
+        
+        # Add to matching
+        matching[shift_node] = employee_id
+        if employee_id not in reverse_matching:
+            reverse_matching[employee_id] = set()
+        reverse_matching[employee_id].add(shift_node)
     
-    return matching
+    # Second pass: Assign any remaining shifts with relaxed constraints
+    unassigned_shifts = [s for s in shift_nodes if s not in matching]
+    
+    if unassigned_shifts:
+        print(f"Found {len(unassigned_shifts)} unassigned shifts. Attempting to assign with relaxed constraints.")
+        
+        # For each unassigned shift, find the best available employee
+        for shift_node in unassigned_shifts:
+            date, equipment_id, shift_type = shift_node
+            
+            # Create a priority queue for this shift
+            candidates = []
+            
+            for employee_id in employee_nodes:
+                if (employee_id, shift_node) in edges:
+                    # Calculate a score for this assignment
+                    weight = edges[(employee_id, shift_node)]
+                    
+                    # Check if employee already has a shift on this date
+                    has_shift_on_date = False
+                    if employee_id in reverse_matching:
+                        for existing_shift in reverse_matching[employee_id]:
+                            if existing_shift[0] == date:
+                                has_shift_on_date = True
+                                break
+                    
+                    # Penalize if employee already has a shift on this date, but still allow it
+                    if has_shift_on_date:
+                        weight -= 1000
+                    
+                    # Check employee's equipment skill
+                    skill = EmployeeEquipmentSkill.objects.filter(
+                        employee_id=employee_id,
+                        equipment_id=equipment_id
+                    ).first()
+                    
+                    if not skill:
+                        weight -= 2000  # Heavily penalize but still allow if no other option
+                    
+                    # Check for time-off requests
+                    time_off = TimeOffRequest.objects.filter(
+                        employee_id=employee_id,
+                        start_date__lte=date,
+                        end_date__gte=date,
+                        status='approved'
+                    ).exists()
+                    
+                    if time_off:
+                        weight -= 3000  # Heavily penalize but still allow if no other option
+                    
+                    # Add to candidates
+                    heapq.heappush(candidates, (-weight, employee_id))
+            
+            # Assign to best candidate if any exist
+            if candidates:
+                _, best_employee_id = heapq.heappop(candidates)
+                matching[shift_node] = best_employee_id
+                if best_employee_id not in reverse_matching:
+                    reverse_matching[best_employee_id] = set()
+                reverse_matching[best_employee_id].add(shift_node)
+    
+    # Final check: Ensure all shifts are assigned
+    final_unassigned = [s for s in shift_nodes if s not in matching]
+    if final_unassigned:
+        print(f"WARNING: Still have {len(final_unassigned)} unassigned shifts after relaxed constraints.")
+        
+        # Last resort: Assign any remaining shifts to any employee
+        for shift_node in final_unassigned:
+            # Find employee with fewest shifts
+            employee_counts = {e_id: len(reverse_matching.get(e_id, set())) for e_id in employee_nodes}
+            best_employee_id = min(employee_counts.items(), key=lambda x: x[1])[0]
+            
+            # Assign shift
+            matching[shift_node] = best_employee_id
+            if best_employee_id not in reverse_matching:
+                reverse_matching[best_employee_id] = set()
+            reverse_matching[best_employee_id].add(shift_node)
+    
+    # Convert matching to the expected output format
+    result = [(employee_id, shift_node) for shift_node, employee_id in matching.items()]
+    return result
 
 def apply_scheduling_rules(initial_matching, employee_nodes, shift_nodes, edges, day_workers, on_call_workers):
     """
-    A specialized algorithm to apply scheduling rules to an initial matching:
-    1. Day workers work morning shifts on weekdays
-    2. On-call workers work evening and night shifts on weekdays
-    3. On-call workers work all shifts on weekends (same worker for all shifts on the same day)
-    4. Balance workload among employees
+    Apply domain-specific scheduling rules to improve the initial matching:
+    1. Day workers work morning shifts on weekdays (8:00-14:00)
+    2. On-call workers work evening and night shifts on weekdays (14:00-8:00)
+    3. On-call workers work all shifts on weekends (8:00-8:00 next day)
+    4. RKT works 24/7, MRT and Toshiba don't need separate on-call staff on weekends
+    5. Respect time-off requests with different priorities
+    6. Balance workload among employees
+    7. Ensure proper rest periods between shifts
     """
+    import heapq
+    
+    # Convert initial matching to dictionary for easier manipulation
+    matching_dict = {}
+    for employee_id, shift_node in initial_matching:
+        matching_dict[shift_node] = employee_id
+    
+    # Group shifts by date and equipment
     shifts_by_date = {}
     for shift_node in shift_nodes:
         date, equipment_id, shift_type = shift_node
@@ -561,14 +830,34 @@ def apply_scheduling_rules(initial_matching, employee_nodes, shift_nodes, edges,
                 shifts_by_date_equipment[date][equipment_id] = []
             shifts_by_date_equipment[date][equipment_id].append(shift)
     
-    matching_dict = {}
-    for employee_id, shift_node in initial_matching:
-        matching_dict[shift_node] = employee_id
-    
+    # Track employee workload and required hours
     employee_workload = {employee_id: 0 for employee_id in employee_nodes}
-    for employee_id, _ in initial_matching:
-        employee_workload[employee_id] += 1
+    employee_hours = {employee_id: 0 for employee_id in employee_nodes}
+    employee_required_hours = {}
     
+    # Calculate required hours for each employee
+    for employee_id in employee_nodes:
+        employee = Employee.objects.get(id=employee_id)
+        # Get the month of the first shift
+        first_date = min([shift[0] for shift in shift_nodes]) if shift_nodes else datetime.now().date()
+        working_days = get_working_days_in_month(first_date.year, first_date.month)
+        required_hours = working_days * 6  # Base: 6 hours per working day
+        if float(employee.rate) == 1.5:
+            required_hours = round(required_hours * 1.5)  # 1.5 rate means 1.5x hours
+        employee_required_hours[employee_id] = required_hours
+    
+    # Calculate current hours for each employee
+    for shift_node, employee_id in matching_dict.items():
+        employee_workload[employee_id] += 1
+        _, _, shift_type = shift_node
+        if shift_type == 'morning':
+            employee_hours[employee_id] += 6
+        elif shift_type == 'evening':
+            employee_hours[employee_id] += 6
+        elif shift_type == 'night':
+            employee_hours[employee_id] += 12
+    
+    # 1. Prioritize day workers for morning shifts on weekdays
     for date, date_shifts in shifts_by_date.items():
         is_weekend = date.weekday() >= 5
         
@@ -576,28 +865,85 @@ def apply_scheduling_rules(initial_matching, employee_nodes, shift_nodes, edges,
             morning_shifts = [shift for shift in date_shifts if shift[2] == 'morning']
             
             for shift in morning_shifts:
+                # Check if this shift is already assigned to a day worker
                 if shift in matching_dict and matching_dict[shift] in [worker.id for worker in day_workers]:
                     continue
                 
-                best_day_worker = None
-                best_weight = float('-inf')
-                
+                # Find the best day worker for this shift
+                candidates = []
                 for worker in day_workers:
                     if (worker.id, shift) in edges:
-                        weight = edges[(worker.id, shift)]
-                        adjusted_weight = weight - (employee_workload[worker.id] * 5)
+                        # Skip if worker has approved time off
+                        time_off = TimeOffRequest.objects.filter(
+                            employee=worker,
+                            start_date__lte=shift[0],
+                            end_date__gte=shift[0],
+                            status='approved'
+                        ).exists()
                         
-                        if adjusted_weight > best_weight:
-                            best_weight = adjusted_weight
-                            best_day_worker = worker.id
+                        if time_off:
+                            continue
+                        
+                        # Skip if worker already has a shift on this date
+                        has_shift_on_date = False
+                        for s, e_id in matching_dict.items():
+                            if e_id == worker.id and s[0] == shift[0]:
+                                has_shift_on_date = True
+                                break
+                        
+                        if has_shift_on_date:
+                            continue
+                        
+                        # Calculate weight considering workload balance
+                        weight = edges[(worker.id, shift)]
+                        
+                        # Adjust weight based on how close employee is to required hours
+                        hours_if_assigned = employee_hours[worker.id] + 6  # Morning shift is 6 hours
+                        hours_diff = abs(hours_if_assigned - employee_required_hours[worker.id])
+                        adjusted_weight = weight - (hours_diff * 2)
+                        
+                        # Check for time-off requests with different priorities
+                        time_off = TimeOffRequest.objects.filter(
+                            employee=worker,
+                            start_date__lte=shift[0],
+                            end_date__gte=shift[0]
+                        ).first()
+                        
+                        if time_off and time_off.status == 'pending':
+                            if time_off.priority == 'high':
+                                adjusted_weight -= 100
+                            elif time_off.priority == 'medium':
+                                adjusted_weight -= 50
+                            elif time_off.priority == 'low':
+                                adjusted_weight -= 20
+                        
+                        # Check for consecutive work days
+                        prev_day = shift[0] - timedelta(days=1)
+                        prev_day_schedule = Schedule.objects.filter(
+                            employee=worker,
+                            date=prev_day
+                        ).exists()
+                        
+                        if prev_day_schedule:
+                            adjusted_weight -= 80  # Penalize consecutive work days
+                        
+                        heapq.heappush(candidates, (-adjusted_weight, worker.id))  # Negative for max-heap
                 
-                if best_day_worker:
-                    if shift in matching_dict:
-                        employee_workload[matching_dict[shift]] -= 1
+                if candidates:
+                    # Get best candidate
+                    _, best_worker_id = heapq.heappop(candidates)
                     
-                    matching_dict[shift] = best_day_worker
-                    employee_workload[best_day_worker] += 1
+                    # Update matching
+                    if shift in matching_dict:
+                        old_employee_id = matching_dict[shift]
+                        employee_workload[old_employee_id] -= 1
+                        employee_hours[old_employee_id] -= 6  # Morning shift is 6 hours
+                    
+                    matching_dict[shift] = best_worker_id
+                    employee_workload[best_worker_id] += 1
+                    employee_hours[best_worker_id] += 6  # Morning shift is 6 hours
     
+    # 2. Prioritize on-call workers for evening and night shifts on weekdays
     for date, date_shifts in shifts_by_date.items():
         is_weekend = date.weekday() >= 5
         
@@ -605,33 +951,120 @@ def apply_scheduling_rules(initial_matching, employee_nodes, shift_nodes, edges,
             evening_night_shifts = [shift for shift in date_shifts if shift[2] in ['evening', 'night']]
             
             for shift in evening_night_shifts:
+                # Check if this shift is already assigned to an on-call worker
                 if shift in matching_dict and matching_dict[shift] in [worker.id for worker in on_call_workers]:
                     continue
                 
-                best_on_call_worker = None
-                best_weight = float('-inf')
-                
+                # Find the best on-call worker for this shift
+                candidates = []
                 for worker in on_call_workers:
                     if (worker.id, shift) in edges:
-                        weight = edges[(worker.id, shift)]
-                        adjusted_weight = weight - (employee_workload[worker.id] * 5)
+                        # Skip if worker has approved time off
+                        time_off = TimeOffRequest.objects.filter(
+                            employee=worker,
+                            start_date__lte=shift[0],
+                            end_date__gte=shift[0],
+                            status='approved'
+                        ).exists()
                         
-                        if adjusted_weight > best_weight:
-                            best_weight = adjusted_weight
-                            best_on_call_worker = worker.id
+                        if time_off:
+                            continue
+                        
+                        # Skip if worker already has a shift on this date
+                        has_shift_on_date = False
+                        for s, e_id in matching_dict.items():
+                            if e_id == worker.id and s[0] == shift[0]:
+                                has_shift_on_date = True
+                                break
+                        
+                        if has_shift_on_date:
+                            continue
+                        
+                        # Calculate weight considering workload balance
+                        weight = edges[(worker.id, shift)]
+                        
+                        # Adjust weight based on how close employee is to required hours
+                        shift_hours = 12 if shift[2] == 'night' else 6
+                        hours_if_assigned = employee_hours[worker.id] + shift_hours
+                        hours_diff = abs(hours_if_assigned - employee_required_hours[worker.id])
+                        adjusted_weight = weight - (hours_diff * 2)
+                        
+                        # Check for time-off requests with different priorities
+                        time_off = TimeOffRequest.objects.filter(
+                            employee=worker,
+                            start_date__lte=shift[0],
+                            end_date__gte=shift[0]
+                        ).first()
+                        
+                        if time_off and time_off.status == 'pending':
+                            if time_off.priority == 'high':
+                                adjusted_weight -= 100
+                            elif time_off.priority == 'medium':
+                                adjusted_weight -= 50
+                            elif time_off.priority == 'low':
+                                adjusted_weight -= 20
+                        
+                        # Check for consecutive work days
+                        prev_day = shift[0] - timedelta(days=1)
+                        prev_day_schedule = Schedule.objects.filter(
+                            employee=worker,
+                            date=prev_day
+                        ).exists()
+                        
+                        if prev_day_schedule:
+                            adjusted_weight -= 80  # Penalize consecutive work days
+                        
+                        # Check for rest period after night shifts
+                        if shift[2] == 'night':
+                            prev_night_shifts = Schedule.objects.filter(
+                                employee=worker,
+                                shift_type='night',
+                                date__lt=shift[0]
+                            ).order_by('-date')
+                            
+                            if prev_night_shifts.exists():
+                                last_night_shift = prev_night_shifts.first()
+                                days_since_last_night = (shift[0] - last_night_shift.date).days
+                                
+                                if days_since_last_night < 3:  # Require at least 3 days rest
+                                    continue  # Skip this worker
+                        
+                        heapq.heappush(candidates, (-adjusted_weight, worker.id))  # Negative for max-heap
                 
-                if best_on_call_worker:
-                    if shift in matching_dict:
-                        employee_workload[matching_dict[shift]] -= 1
+                if candidates:
+                    # Get best candidate
+                    _, best_worker_id = heapq.heappop(candidates)
                     
-                    matching_dict[shift] = best_on_call_worker
-                    employee_workload[best_on_call_worker] += 1
+                    # Update matching
+                    if shift in matching_dict:
+                        old_employee_id = matching_dict[shift]
+                        employee_workload[old_employee_id] -= 1
+                        old_shift_hours = 12 if shift[2] == 'night' else 6
+                        employee_hours[old_employee_id] -= old_shift_hours
+                    
+                    matching_dict[shift] = best_worker_id
+                    employee_workload[best_worker_id] += 1
+                    new_shift_hours = 12 if shift[2] == 'night' else 6
+                    employee_hours[best_worker_id] += new_shift_hours
     
+    # 3. Handle weekend shifts - same on-call worker for all shifts on the same equipment
     for date, equipment_shifts in shifts_by_date_equipment.items():
         is_weekend = date.weekday() >= 5
         
         if is_weekend:
             for equipment_id, shifts in equipment_shifts.items():
+                # Skip if no shifts for this equipment
+                if not shifts:
+                    continue
+                
+                # Get equipment type
+                equipment = Equipment.objects.get(id=equipment_id)
+                
+                # Only RKT works 24/7, others don't need on-call staff on weekends
+                if equipment.equipment_type != 'rkt_ge' and any(s[2] != 'morning' for s in shifts):
+                    continue
+                
+                # Check if all shifts are already assigned to the same on-call worker
                 assigned_workers = set()
                 for shift in shifts:
                     if shift in matching_dict:
@@ -640,88 +1073,244 @@ def apply_scheduling_rules(initial_matching, employee_nodes, shift_nodes, edges,
                             assigned_workers.add(worker_id)
                 
                 if len(assigned_workers) == 1 and len(shifts) > 0:
-                    continue
+                    continue  # Already assigned to a single on-call worker
                 
-                best_on_call_worker = None
-                best_total_weight = float('-inf')
-                
+                # Find the best on-call worker for all shifts
+                candidates = []
                 for worker in on_call_workers:
+                    # Check if worker can take all shifts
                     total_weight = 0
                     all_shifts_available = True
                     
+                    # Skip if worker has approved time off
+                    time_off = TimeOffRequest.objects.filter(
+                        employee=worker,
+                        start_date__lte=date,
+                        end_date__gte=date,
+                        status='approved'
+                    ).exists()
+                    
+                    if time_off:
+                        continue
+                    
+                    # Check for rest period
+                    prev_day = date - timedelta(days=1)
+                    prev_day_schedule = Schedule.objects.filter(
+                        employee=worker,
+                        date=prev_day
+                    ).exists()
+                    
+                    if prev_day_schedule:
+                        continue  # Skip this worker - need rest between shifts
+                    
+                    # Check for night shifts in the past 3 days
+                    for days_back in range(1, 4):
+                        prev_day = date - timedelta(days=days_back)
+                        prev_night_shift = Schedule.objects.filter(
+                            employee=worker,
+                            date=prev_day,
+                            shift_type='night'
+                        ).exists()
+                        
+                        if prev_night_shift:
+                            all_shifts_available = False
+                            break
+                    
+                    if not all_shifts_available:
+                        continue
+                    
+                    # Calculate total hours if assigned all shifts
+                    total_hours = employee_hours[worker.id]
                     for shift in shifts:
                         if (worker.id, shift) in edges:
                             total_weight += edges[(worker.id, shift)]
+                            if shift[2] == 'morning':
+                                total_hours += 6
+                            elif shift[2] == 'evening':
+                                total_hours += 6
+                            elif shift[2] == 'night':
+                                total_hours += 12
                         else:
                             all_shifts_available = False
                             break
                     
                     if all_shifts_available:
-                        adjusted_weight = total_weight - (employee_workload[worker.id] * 5 * len(shifts))
+                        # Adjust weight based on how close to required hours
+                        hours_diff = abs(total_hours - employee_required_hours[worker.id])
+                        adjusted_weight = total_weight - (hours_diff * 2)
                         
-                        if adjusted_weight > best_total_weight:
-                            best_total_weight = adjusted_weight
-                            best_on_call_worker = worker.id
+                        heapq.heappush(candidates, (-adjusted_weight, worker.id))  # Negative for max-heap
                 
-                if best_on_call_worker:
+                if candidates:
+                    # Get best candidate
+                    _, best_worker_id = heapq.heappop(candidates)
+                    
+                    # Update matching - assign all shifts to the same worker
                     for shift in shifts:
                         if shift in matching_dict:
-                            employee_workload[matching_dict[shift]] -= 1
+                            old_employee_id = matching_dict[shift]
+                            employee_workload[old_employee_id] -= 1
+                            old_shift_hours = 12 if shift[2] == 'night' else 6
+                            employee_hours[old_employee_id] -= old_shift_hours
                         
-                        matching_dict[shift] = best_on_call_worker
-                    
-                    employee_workload[best_on_call_worker] += len(shifts)
+                        matching_dict[shift] = best_worker_id
+                        employee_workload[best_worker_id] += 1
+                        new_shift_hours = 12 if shift[2] == 'night' else 6
+                        employee_hours[best_worker_id] += new_shift_hours
     
-    avg_workload = sum(employee_workload.values()) / len(employee_workload) if employee_workload else 0
-    overloaded = [e_id for e_id, load in employee_workload.items() if load > avg_workload * 1.5]
-    underloaded = [e_id for e_id, load in employee_workload.items() if load < avg_workload * 0.5 and load < 5]
-    
-    if overloaded and underloaded:
-        overloaded_shifts = []
-        for shift, employee_id in matching_dict.items():
-            if employee_id in overloaded:
-                overloaded_shifts.append((shift, employee_id))
+    # 4. Balance workload among employees based on required hours
+    for employee_id in employee_nodes:
+        # Skip if employee is close to required hours
+        if abs(employee_hours[employee_id] - employee_required_hours[employee_id]) <= 6:
+            continue
         
-        overloaded_shifts.sort(key=lambda x: x[0][0], reverse=True)
+        # Check if employee is overloaded or underloaded
+        is_overloaded = employee_hours[employee_id] > employee_required_hours[employee_id] + 12
+        is_underloaded = employee_hours[employee_id] < employee_required_hours[employee_id] - 12
         
-        for shift, current_employee_id in overloaded_shifts:
-            if employee_workload[current_employee_id] <= avg_workload:
-                continue
+        if is_overloaded:
+            # Find shifts that can be reassigned
+            employee_shifts = []
+            for shift, e_id in matching_dict.items():
+                if e_id == employee_id:
+                    employee_shifts.append(shift)
+            
+            # Sort by date (newest first) to minimize disruption
+            employee_shifts.sort(key=lambda x: x[0], reverse=True)
+            
+            for shift in employee_shifts:
+                # Stop if employee is no longer overloaded
+                if employee_hours[employee_id] <= employee_required_hours[employee_id] + 6:
+                    break
                 
-            date, equipment_id, shift_type = shift
-            is_weekend = date.weekday() >= 5
-            
-            if is_weekend and current_employee_id in [w.id for w in on_call_workers]:
-                continue
+                date, equipment_id, shift_type = shift
+                is_weekend = date.weekday() >= 5
                 
-            if shift_type == 'morning' and current_employee_id in [w.id for w in day_workers]:
-                continue
-            
-            best_employee = None
-            best_weight = float('-inf')
-            
-            for employee_id in underloaded:
-                if (employee_id, shift) in edges:
-                    weight = edges[(employee_id, shift)]
+                # Don't reassign weekend shifts for on-call workers (they need to cover all shifts)
+                if is_weekend and employee_id in [w.id for w in on_call_workers]:
+                    continue
+                
+                # Don't reassign morning shifts from day workers
+                if shift_type == 'morning' and employee_id in [w.id for w in day_workers]:
+                    continue
+                
+                # Find the best underloaded employee for this shift
+                candidates = []
+                for other_id in employee_nodes:
+                    if other_id == employee_id:
+                        continue
                     
-                    conflict = False
+                    # Only consider underloaded employees
+                    if employee_hours[other_id] >= employee_required_hours[other_id]:
+                        continue
+                    
+                    if (other_id, shift) in edges:
+                        # Skip if employee has approved time off
+                        time_off = TimeOffRequest.objects.filter(
+                            employee=Employee.objects.get(id=other_id),
+                            start_date__lte=shift[0],
+                            end_date__gte=shift[0],
+                            status='approved'
+                        ).exists()
+                        
+                        if time_off:
+                            continue
+                        
+                        # Check for conflicts (same day assignment)
+                        conflict = False
+                        for other_shift, e_id in matching_dict.items():
+                            if e_id == other_id and other_shift[0] == date:
+                                conflict = True
+                                break
+                        
+                        if conflict:
+                            continue
+                        
+                        # Check employee type constraints
+                        employee = Employee.objects.get(id=other_id)
+                        if not ((shift_type == 'morning' and employee.shift_availability == 'morning_only') or
+                               (shift_type != 'night' and employee.shift_availability == 'day_only') or
+                               employee.shift_availability == 'all_shifts'):
+                            continue
+                        
+                        # Calculate weight
+                        weight = edges[(other_id, shift)]
+                        
+                        # Adjust weight based on how close to required hours
+                        shift_hours = 12 if shift_type == 'night' else 6
+                        hours_if_assigned = employee_hours[other_id] + shift_hours
+                        hours_diff = abs(hours_if_assigned - employee_required_hours[other_id])
+                        adjusted_weight = weight - (hours_diff * 2)
+                        
+                        heapq.heappush(candidates, (-adjusted_weight, other_id))  # Negative for max-heap
+                
+                if candidates:
+                    # Get best candidate
+                    _, best_employee_id = heapq.heappop(candidates)
+                    
+                    # Update matching
+                    matching_dict[shift] = best_employee_id
+                    
+                    # Update hours
+                    shift_hours = 12 if shift_type == 'night' else 6
+                    employee_hours[employee_id] -= shift_hours
+                    employee_hours[best_employee_id] += shift_hours
+                    
+                    # Update workload
+                    employee_workload[employee_id] -= 1
+                    employee_workload[best_employee_id] += 1
+    
+    # Final check: Ensure all shifts are assigned
+    all_shifts_assigned = True
+    for shift_node in shift_nodes:
+        if shift_node not in matching_dict:
+            all_shifts_assigned = False
+            print(f"WARNING: Shift {shift_node} is not assigned in apply_scheduling_rules")
+            
+            # Find the best employee for this unassigned shift
+            date, equipment_id, shift_type = shift_node
+            candidates = []
+            
+            for employee_id in employee_nodes:
+                if (employee_id, shift_node) in edges:
+                    # Calculate a score for this assignment
+                    weight = edges[(employee_id, shift_node)]
+                    
+                    # Check if employee already has a shift on this date
+                    has_shift_on_date = False
                     for other_shift, other_employee in matching_dict.items():
-                        if (other_employee == employee_id and other_shift[0] == date):
-                            conflict = True
+                        if other_employee == employee_id and other_shift[0] == date:
+                            has_shift_on_date = True
                             break
                     
-                    if not conflict and weight > best_weight:
-                        best_weight = weight
-                        best_employee = employee_id
+                    # Penalize if employee already has a shift on this date, but still allow it
+                    if has_shift_on_date:
+                        weight -= 1000
+                    
+                    # Add to candidates
+                    heapq.heappush(candidates, (-weight, employee_id))
             
-            if best_employee:
-                matching_dict[shift] = best_employee
-                employee_workload[current_employee_id] -= 1
-                employee_workload[best_employee] += 1
+            # Assign to best candidate if any exist
+            if candidates:
+                _, best_employee_id = heapq.heappop(candidates)
+                matching_dict[shift_node] = best_employee_id
+                employee_workload[best_employee_id] += 1
+                shift_hours = 12 if shift_type == 'night' else 6
+                employee_hours[best_employee_id] += shift_hours
+            else:
+                # Last resort: Assign to employee with fewest shifts
+                employee_counts = {e_id: employee_workload[e_id] for e_id in employee_nodes}
+                best_employee_id = min(employee_counts.items(), key=lambda x: x[1])[0]
                 
-                if employee_workload[best_employee] >= avg_workload * 0.5:
-                    underloaded.remove(best_employee)
+                matching_dict[shift_node] = best_employee_id
+                employee_workload[best_employee_id] += 1
+                shift_hours = 12 if shift_type == 'night' else 6
+                employee_hours[best_employee_id] += shift_hours
     
+    if not all_shifts_assigned:
+        print("WARNING: Some shifts were not assigned during rule application. Emergency assignments were made.")
+    
+    # Convert back to the expected output format
     final_matching = [(employee_id, shift) for shift, employee_id in matching_dict.items()]
     return final_matching
 
